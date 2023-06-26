@@ -61,6 +61,7 @@ public class OrderbookImpl implements IOrderbook{
             case BID -> orderList = bids;
             default -> throw new IllegalArgumentException(side.toString());
         }
+
         int index = orderList.size();
 
         // find the index to insert the newOrder by comparing the prices
