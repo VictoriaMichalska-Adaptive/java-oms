@@ -9,19 +9,22 @@ import org.junit.jupiter.api.Test;
 
 public class OrderbookTest {
     private OrderbookImpl orderbook;
-    private double originalBidPrice = 15;
-    private long originalBidSize = 3;
 
     @BeforeEach
     void setUp() {
         this.orderbook = new OrderbookImpl();
-        orderbook.placeOrder(originalBidPrice, originalBidSize, Side.BID); // create original highest bid
     }
 
     @Test
     @DisplayName("Non-crossing BID is placed, and returns its orderId and a RESTING status")
     public void placeRestingBid() {
-        final var returnedBid = orderbook.placeOrder(originalBidPrice - 5, originalBidSize, Side.BID);
+        // arrange
+        orderbook.placeOrder(15, 10, Side.BID); // crossing bid
+
+        // act
+        final var returnedBid = orderbook.placeOrder(10, 10, Side.BID); // non-crossing bid
+
+        // assert
         Assertions.assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.RESTING, returnedBid.getStatus());
     }
@@ -29,7 +32,13 @@ public class OrderbookTest {
     @Test
     @DisplayName("Non-crossing ASK is placed, and returns its orderId and a RESTING status")
     public void placeRestingAsk() {
-        final var returnedAsk = orderbook.placeOrder(originalBidPrice - 5, originalBidSize, Side.ASK);
+        // arrange
+        orderbook.placeOrder(15, 10, Side.ASK); // crossing ask
+
+        // act
+        final var returnedAsk = orderbook.placeOrder(10, 10, Side.ASK); // non-crossing ask
+
+        // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.RESTING, returnedAsk.getStatus());
     }
@@ -37,7 +46,13 @@ public class OrderbookTest {
     @Test
     @DisplayName("Crossing BID that will be partially filled is placed and returns its orderId and a PARTIAL status")
     public void placePartialBid() {
-        final var returnedBid = orderbook.placeOrder(originalBidPrice + 5, originalBidSize, Side.BID);
+        // arrange
+        orderbook.placeOrder(15, 10, Side.ASK); // crossing ask
+
+        // act
+        final var returnedBid = orderbook.placeOrder(10, 15, Side.BID); // crossing bid
+
+        // assert
         Assertions.assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.PARTIAL, returnedBid.getStatus());
     }
@@ -45,7 +60,13 @@ public class OrderbookTest {
     @Test
     @DisplayName("Crossing ASK that will be partially filled is placed and returns its orderId and a PARTIAL status")
     public void placePartialAsk() {
-        final var returnedAsk = orderbook.placeOrder(originalBidPrice + 5, originalBidSize, Side.ASK);
+        // arrange
+        orderbook.placeOrder(15, 10, Side.BID); // crossing bid
+
+        // act
+        final var returnedAsk = orderbook.placeOrder(10, 15, Side.ASK); // crossing ask
+
+        // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.PARTIAL, returnedAsk.getStatus());
     }
@@ -53,7 +74,13 @@ public class OrderbookTest {
     @Test
     @DisplayName("Crossing BID that will be filled entirely is placed and returns its orderId and a FILLED status")
     public void placeFilledBid() {
-        final var returnedBid = orderbook.placeOrder(originalBidPrice + 5, originalBidSize, Side.BID);
+        // arrange
+        orderbook.placeOrder(15, 10, Side.ASK); // crossing ask
+
+        // act
+        final var returnedBid = orderbook.placeOrder(10, 10, Side.BID); // crossing bid
+
+        // assert
         Assertions.assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.FILLED, returnedBid.getStatus());
     }
@@ -61,7 +88,13 @@ public class OrderbookTest {
     @Test
     @DisplayName("Crossing ASK that will be filled entirely is placed and returns its orderId and a FILLED status")
     public void placeFilledAsk() {
-        final var returnedAsk = orderbook.placeOrder(originalBidPrice + 5, originalBidSize, Side.ASK);
+        // arrange
+        orderbook.placeOrder(15, 10, Side.BID); // crossing bid
+
+        // act
+        final var returnedAsk = orderbook.placeOrder(10, 10, Side.ASK); // crossing ask
+
+        // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.FILLED, returnedAsk.getStatus());
     }
@@ -69,8 +102,11 @@ public class OrderbookTest {
     @Test
     @DisplayName("BID is cancelled and returns its orderId and a CANCELLED status")
     public void cancelBid() {
-        final var returnedBid = orderbook.placeOrder(originalBidPrice + 5, originalBidSize, Side.BID);
+        // arrange
+        final var returnedBid = orderbook.placeOrder(10, 15, Side.BID);
+        // act
         final var cancelledBid = orderbook.cancelOrder(returnedBid.getOrderId());
+        // assert
         Assertions.assertEquals(returnedBid.getOrderId(), cancelledBid.getOrderId());
         Assertions.assertEquals(Status.CANCELLED, cancelledBid.getStatus());
     }
@@ -78,8 +114,11 @@ public class OrderbookTest {
     @Test
     @DisplayName("ASK is cancelled and returns its orderId and a CANCELLED status")
     public void cancelAsk() {
-        final var returnedAsk = orderbook.placeOrder(originalBidPrice + 5, originalBidSize, Side.ASK);
+        // arrange
+        final var returnedAsk = orderbook.placeOrder(10, 15, Side.ASK);
+        // act
         final var cancelledAsk = orderbook.cancelOrder(returnedAsk.getOrderId());
+        // assert
         Assertions.assertEquals(returnedAsk.getOrderId(), cancelledAsk.getOrderId());
         Assertions.assertEquals(Status.CANCELLED, cancelledAsk.getStatus());
     }
