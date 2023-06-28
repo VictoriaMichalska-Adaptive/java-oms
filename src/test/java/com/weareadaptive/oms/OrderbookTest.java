@@ -19,7 +19,7 @@ public class OrderbookTest {
     @DisplayName("Non-crossing BID is placed, and returns its orderId and a RESTING status")
     public void placeRestingBid() {
         // arrange
-        orderbook.placeOrder(15, 10, Side.BID); // crossing bid
+        orderbook.placeOrder(15, 10, Side.ASK); // ask
 
         // act
         final var returnedBid = orderbook.placeOrder(10, 10, Side.BID); // non-crossing bid
@@ -33,7 +33,7 @@ public class OrderbookTest {
     @DisplayName("Non-crossing ASK is placed, and returns its orderId and a RESTING status")
     public void placeRestingAsk() {
         // arrange
-        orderbook.placeOrder(15, 10, Side.ASK); // crossing ask
+        orderbook.placeOrder(15, 10, Side.ASK); // bid
 
         // act
         final var returnedAsk = orderbook.placeOrder(10, 10, Side.ASK); // non-crossing ask
@@ -47,7 +47,7 @@ public class OrderbookTest {
     @DisplayName("Crossing BID that will be partially filled is placed and returns its orderId and a PARTIAL status")
     public void placePartialBid() {
         // arrange
-        orderbook.placeOrder(15, 10, Side.ASK); // crossing ask
+        orderbook.placeOrder(10, 10, Side.ASK); // crossing ask
 
         // act
         final var returnedBid = orderbook.placeOrder(10, 15, Side.BID); // crossing bid
@@ -61,7 +61,7 @@ public class OrderbookTest {
     @DisplayName("Crossing ASK that will be partially filled is placed and returns its orderId and a PARTIAL status")
     public void placePartialAsk() {
         // arrange
-        orderbook.placeOrder(15, 10, Side.BID); // crossing bid
+        orderbook.placeOrder(5, 10, Side.BID); // bid
 
         // act
         final var returnedAsk = orderbook.placeOrder(10, 15, Side.ASK); // crossing ask
@@ -75,10 +75,10 @@ public class OrderbookTest {
     @DisplayName("Crossing BID that will be filled entirely is placed and returns its orderId and a FILLED status")
     public void placeFilledBid() {
         // arrange
-        orderbook.placeOrder(15, 10, Side.ASK); // crossing ask
+        orderbook.placeOrder(10, 10, Side.ASK); // ask
 
         // act
-        final var returnedBid = orderbook.placeOrder(10, 10, Side.BID); // crossing bid
+        final var returnedBid = orderbook.placeOrder(15, 5, Side.BID); // crossing bid
 
         // assert
         Assertions.assertTrue(returnedBid.getOrderId() > 0);
@@ -89,10 +89,10 @@ public class OrderbookTest {
     @DisplayName("Crossing ASK that will be filled entirely is placed and returns its orderId and a FILLED status")
     public void placeFilledAsk() {
         // arrange
-        orderbook.placeOrder(15, 10, Side.BID); // crossing bid
+        orderbook.placeOrder(10, 10, Side.BID); // bid
 
         // act
-        final var returnedAsk = orderbook.placeOrder(10, 10, Side.ASK); // crossing ask
+        final var returnedAsk = orderbook.placeOrder(15, 5, Side.ASK); // crossing ask
 
         // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);

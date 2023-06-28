@@ -6,9 +6,13 @@ import com.weareadaptive.oms.util.Side;
 import com.weareadaptive.oms.util.Status;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 
 public class OrderbookImpl implements IOrderbook{
     long currentOrderId = 0;
+    HashMap<Status, HashSet<Long>> allStatuses = new HashMap<>();
     ArrayList<Order> asks = new ArrayList<>();
     ArrayList<Order> bids = new ArrayList<>();
 
@@ -26,54 +30,81 @@ public class OrderbookImpl implements IOrderbook{
 
     private ExecutionResult fillOutOrder(Side side, long id, double price, long size) {
         final var newOrder = new Order(id, price, size);
-        ArrayList<Order> orderList = null;
-        ArrayList<Order> otherSideList = null;
-        switch(side) {
-            case ASK:
+        ArrayList<Order> orderList;
+        ArrayList<Order> otherSideList;
+        switch (side)
+        {
+            case ASK ->
+            {
                 orderList = asks;
                 otherSideList = bids;
-            case BID:
+            }
+            case BID ->
+            {
                 orderList = bids;
                 otherSideList = asks;
+            }
+            default -> throw new IllegalArgumentException();
         }
+        if (orderList.isEmpty() || otherSideList.isEmpty()) {
+            return findMatchingOrders(newOrder, orderList, otherSideList);
+        }
+        else if (orderList.get(0).getPrice() < newOrder.getPrice())
+        {
+            return findMatchingOrders(newOrder, orderList, otherSideList);
+        }
+        else
+        {
+            int index = Collections.binarySearch(orderList, newOrder);
+            if (index < 0) index = ~index;
+            orderList.add(index, newOrder);
 
-        addOrderToSortedList(side, newOrder);
-
-        if (otherSideList == null || otherSideList.isEmpty()) {
             return new ExecutionResult(id, Status.RESTING);
         }
-        else if (!orderList.isEmpty()) {
-            if (orderList.get(0).getPrice() < price)
-            {
-                return new ExecutionResult(id, Status.RESTING);
-            }
-            else {
-                return new ExecutionResult(id, Status.FILLED);
-            }
-        }
-        return new ExecutionResult(id, Status.RESTING);
     }
 
-    private void addOrderToSortedList(Side side, Order newOrder) {
-        final ArrayList<Order> orderList;
-        switch(side) {
-            case ASK -> orderList = asks;
-            case BID -> orderList = bids;
-            default -> throw new IllegalArgumentException(side.toString());
+    private ExecutionResult findMatchingOrders(Order newOrder, ArrayList<Order> orderList, ArrayList<Order> otherSideList)
+    {
+        if (otherSideList.isEmpty()) {
+            orderList.add(0, newOrder);
+            return addToStatusHash(newOrder.getOrderId(), Status.RESTING);
         }
 
-        int index = orderList.size();
-
-        // find the index to insert the newOrder by comparing the prices
-        for (int i = 0; i < orderList.size(); i++) {
-            if (newOrder.getPrice() > orderList.get(i).getPrice()) {
-                index = i;
-                break;
+        long totalSize = newOrder.getSize();
+        final var iter = otherSideList.iterator();
+        while (iter.hasNext())
+        {
+            var order = iter.next();
+            if (order.getPrice() > newOrder.getPrice()) continue;
+            long sizeFulfilled;
+            if (totalSize > 0) {
+                var orderSize = order.getSize();
+                if (orderSize > totalSize) {
+                    order.setSize(orderSize - totalSize);
+                    sizeFulfilled = totalSize;
+                }
+                else {
+                    iter.remove();
+                    sizeFulfilled = orderSize;
+                }
+                totalSize -= sizeFulfilled;
             }
+            else break;
         }
 
-        // insert the newOrder at the determined index
-        orderList.add(index, newOrder);
+        if (totalSize == 0) { return new ExecutionResult(newOrder.getOrderId(), Status.FILLED); }
+        else if (totalSize == newOrder.getSize()) return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
+        else { return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL); }
+    }
+
+    private ExecutionResult addToStatusHash(long orderId, Status status)
+    {
+        if (allStatuses.get(status) == null) {
+            final var restingHashSet = new HashSet<Long>();
+            allStatuses.put(status, restingHashSet);
+        }
+        else { allStatuses.get(status).add(orderId); }
+        return new ExecutionResult(orderId, status);
     }
 
     /**
@@ -81,9 +112,10 @@ public class OrderbookImpl implements IOrderbook{
      *  - Cancels order provided the orderId
      *  - Returns orderId and status (CANCELLED, NONE)
      */
+    // todo: actually cancel the order by moving it from the hashlist lol
     @Override
     public ExecutionResult cancelOrder(long orderId) {
-        return new ExecutionResult(0, Status.NONE);
+        return new ExecutionResult(orderId, Status.CANCELLED);
     }
 
     /**
