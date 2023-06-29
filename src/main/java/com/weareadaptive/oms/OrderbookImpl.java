@@ -58,12 +58,6 @@ public class OrderbookImpl implements IOrderbook{
 
     private ExecutionResult findMatchingOrders(Order newOrder, TreeSet<Order> orderList, TreeSet<Order> otherSideList)
     {
-        if (otherSideList.isEmpty()) {
-            orderList.add(newOrder);
-            activeIds.add(newOrder.getOrderId());
-            return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
-        }
-
         long totalSize = newOrder.getSize();
         final var iter = otherSideList.iterator();
         while (iter.hasNext())
@@ -85,19 +79,12 @@ public class OrderbookImpl implements IOrderbook{
             if (totalSize == 0) break;
         }
 
-        if (totalSize == 0) {
-            return new ExecutionResult(newOrder.getOrderId(), Status.FILLED);
-        }
-        else if (totalSize == newOrder.getSize()) {
-            orderList.add(newOrder);
-            activeIds.add(newOrder.getOrderId());
-            return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
-        }
-        else {
-            orderList.add(newOrder);
-            activeIds.add(newOrder.getOrderId());
-            return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL);
-        }
+        if (totalSize == 0) return new ExecutionResult(newOrder.getOrderId(), Status.FILLED);
+
+        orderList.add(newOrder);
+        activeIds.add(newOrder.getOrderId());
+        if (totalSize == newOrder.getSize()) return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
+        else return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL);
     }
 
     /**
