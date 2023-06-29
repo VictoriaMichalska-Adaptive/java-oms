@@ -68,16 +68,16 @@ public class OrderbookImpl implements IOrderbook{
         final var iter = otherSideList.iterator();
         while (iter.hasNext())
         {
-            var order = iter.next();
-            if (order.getPrice() > newOrder.getPrice()) continue;
+            var orderFromIterator = iter.next();
+            if (orderFromIterator.getPrice() > newOrder.getPrice()) continue;
             long sizeFulfilled;
-            var orderSize = order.getSize();
+            var orderSize = orderFromIterator.getSize();
             if (orderSize > totalSize)
             {
                 sizeFulfilled = totalSize;
-                order.setSize(orderSize - sizeFulfilled);
+                orderFromIterator.setSize(orderSize - sizeFulfilled);
             } else {
-                activeIds.remove(order.getOrderId());
+                activeIds.remove(orderFromIterator.getOrderId());
                 iter.remove();
                 sizeFulfilled = orderSize;
             }
@@ -86,15 +86,16 @@ public class OrderbookImpl implements IOrderbook{
         }
 
         if (totalSize == 0) {
-            activeIds.remove(newOrder.getOrderId());
             return new ExecutionResult(newOrder.getOrderId(), Status.FILLED);
         }
         else if (totalSize == newOrder.getSize()) {
             orderList.add(newOrder);
+            activeIds.add(newOrder.getOrderId());
             return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
         }
         else {
             orderList.add(newOrder);
+            activeIds.add(newOrder.getOrderId());
             return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL);
         }
     }

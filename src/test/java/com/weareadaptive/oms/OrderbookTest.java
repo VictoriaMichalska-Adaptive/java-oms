@@ -41,6 +41,7 @@ public class OrderbookTest {
         // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.RESTING, returnedAsk.getStatus());
+        Assertions.assertTrue(orderbook.activeIds.contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -55,6 +56,7 @@ public class OrderbookTest {
         // assert
         Assertions.assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.PARTIAL, returnedBid.getStatus());
+        Assertions.assertTrue(orderbook.activeIds.contains(returnedBid.getOrderId()));
     }
 
     @Test
@@ -69,6 +71,7 @@ public class OrderbookTest {
         // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.PARTIAL, returnedAsk.getStatus());
+        Assertions.assertTrue(orderbook.activeIds.contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -83,6 +86,7 @@ public class OrderbookTest {
         // assert
         Assertions.assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.FILLED, returnedBid.getStatus());
+        Assertions.assertFalse(orderbook.activeIds.contains(returnedBid.getOrderId()));
     }
 
     @Test
@@ -147,6 +151,7 @@ public class OrderbookTest {
         // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.FILLED, returnedAsk.getStatus());
+        Assertions.assertFalse(orderbook.activeIds.contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -159,6 +164,7 @@ public class OrderbookTest {
         // assert
         Assertions.assertEquals(returnedBid.getOrderId(), cancelledBid.getOrderId());
         Assertions.assertEquals(Status.CANCELLED, cancelledBid.getStatus());
+        Assertions.assertFalse(orderbook.activeIds.contains(returnedBid.getOrderId()));
     }
 
     @Test
@@ -171,25 +177,28 @@ public class OrderbookTest {
         // assert
         Assertions.assertEquals(returnedAsk.getOrderId(), cancelledAsk.getOrderId());
         Assertions.assertEquals(Status.CANCELLED, cancelledAsk.getStatus());
+        Assertions.assertFalse(orderbook.activeIds.contains(returnedAsk.getOrderId()));
     }
 
     @Test
     @DisplayName("Non-existing orderId is used to cancel a BID and returns the orderId and a NONE status")
     public void cancelNonExistingBid() {
-        final var fakeId = 100;
+        final Long fakeId = 100L;
         final var cancelledBid = orderbook.cancelOrder(fakeId);
         Assertions.assertEquals(fakeId, cancelledBid.getOrderId());
         Assertions.assertEquals(Status.NONE, cancelledBid.getStatus());
+        Assertions.assertFalse(orderbook.activeIds.contains(fakeId));
     }
 
     @Test
     @DisplayName("Non-existing orderId is used to cancel a ASK and returns the orderId and a NONE status")
     public void cancelNonExistingAsk() {
-        final var fakeId = 100;
+        final Long fakeId = 100L;
         final var cancelledAsk = orderbook.cancelOrder(fakeId);
         // assert
         Assertions.assertEquals(fakeId, cancelledAsk.getOrderId());
         Assertions.assertEquals(Status.NONE, cancelledAsk.getStatus());
+        Assertions.assertFalse(orderbook.activeIds.contains(fakeId));
     }
 
     @Test
@@ -210,6 +219,7 @@ public class OrderbookTest {
 
         Assertions.assertEquals(0, orderbook.showAsks().size());
         Assertions.assertEquals(0, orderbook.showBids().size());
+        Assertions.assertTrue(orderbook.activeIds.isEmpty());
         Assertions.assertEquals(currentId, orderbook.currentOrderId);
     }
 
@@ -231,6 +241,7 @@ public class OrderbookTest {
 
         Assertions.assertEquals(0, orderbook.showAsks().size());
         Assertions.assertEquals(0, orderbook.showBids().size());
+        Assertions.assertTrue(orderbook.activeIds.isEmpty());
         Assertions.assertNotEquals(currentId, orderbook.currentOrderId);
     }
 
