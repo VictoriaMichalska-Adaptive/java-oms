@@ -5,16 +5,14 @@ import com.weareadaptive.oms.util.Order;
 import com.weareadaptive.oms.util.Side;
 import com.weareadaptive.oms.util.Status;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.TreeSet;
 
 public class OrderbookImpl implements IOrderbook{
     long currentOrderId = 0;
-    HashMap<Status, HashSet<Long>> allStatuses = new HashMap<>();
-    ArrayList<Order> asks = new ArrayList<>();
-    ArrayList<Order> bids = new ArrayList<>();
+    HashSet<Long> activeIds = new HashSet<>();
+    TreeSet<Order> asks = new TreeSet<>();
+    TreeSet<Order> bids = new TreeSet<>();
 
     /**
      * * Implement Place Order logic
@@ -30,8 +28,9 @@ public class OrderbookImpl implements IOrderbook{
 
     private ExecutionResult fillOutOrder(Side side, long id, double price, long size) {
         final var newOrder = new Order(id, price, size);
-        ArrayList<Order> orderList;
-        ArrayList<Order> otherSideList;
+        TreeSet<Order> orderList;
+        TreeSet<Order> otherSideList;
+
         switch (side)
         {
             case ASK ->
@@ -46,28 +45,22 @@ public class OrderbookImpl implements IOrderbook{
             }
             default -> throw new IllegalArgumentException();
         }
-        if (orderList.isEmpty() || otherSideList.isEmpty()) {
+        if ((orderList.isEmpty() || otherSideList.isEmpty()) || (orderList.first().getPrice() < newOrder.getPrice())) {
             return findMatchingOrders(newOrder, orderList, otherSideList);
         }
-        else if (orderList.get(0).getPrice() < newOrder.getPrice())
-        {
-            return findMatchingOrders(newOrder, orderList, otherSideList);
-        }
-        else
-        {
-            int index = Collections.binarySearch(orderList, newOrder);
-            if (index < 0) index = ~index;
-            orderList.add(index, newOrder);
+        else {
+            orderList.add(newOrder);
 
             return new ExecutionResult(id, Status.RESTING);
         }
     }
 
-    private ExecutionResult findMatchingOrders(Order newOrder, ArrayList<Order> orderList, ArrayList<Order> otherSideList)
+    private ExecutionResult findMatchingOrders(Order newOrder, TreeSet<Order> orderList, TreeSet<Order> otherSideList)
     {
         if (otherSideList.isEmpty()) {
-            orderList.add(0, newOrder);
-            return addToStatusHash(newOrder.getOrderId(), Status.RESTING);
+            orderList.add(newOrder);
+            activeIds.add(newOrder.getOrderId());
+            return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
         }
 
         long totalSize = newOrder.getSize();
@@ -80,10 +73,11 @@ public class OrderbookImpl implements IOrderbook{
             if (totalSize > 0) {
                 var orderSize = order.getSize();
                 if (orderSize > totalSize) {
-                    order.setSize(orderSize - totalSize);
                     sizeFulfilled = totalSize;
+                    order.setSize(orderSize - sizeFulfilled);
                 }
                 else {
+                    removeIdFromSystem(order.getOrderId());
                     iter.remove();
                     sizeFulfilled = orderSize;
                 }
@@ -97,14 +91,9 @@ public class OrderbookImpl implements IOrderbook{
         else { return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL); }
     }
 
-    private ExecutionResult addToStatusHash(long orderId, Status status)
+    private void removeIdFromSystem(long orderId)
     {
-        if (allStatuses.get(status) == null) {
-            final var restingHashSet = new HashSet<Long>();
-            allStatuses.put(status, restingHashSet);
-        }
-        else { allStatuses.get(status).add(orderId); }
-        return new ExecutionResult(orderId, status);
+        activeIds.remove(orderId);
     }
 
     /**
@@ -115,6 +104,10 @@ public class OrderbookImpl implements IOrderbook{
     // todo: actually cancel the order by moving it from the hashlist lol
     @Override
     public ExecutionResult cancelOrder(long orderId) {
+        if (!activeIds.contains(orderId)) {
+            return new ExecutionResult(orderId, Status.NONE);
+        }
+        removeIdFromSystem(orderId);
         return new ExecutionResult(orderId, Status.CANCELLED);
     }
 
@@ -125,6 +118,9 @@ public class OrderbookImpl implements IOrderbook{
      */
     @Override
     public void clear() {
+        asks.clear();
+        bids.clear();
+        activeIds.clear();
     }
 
     /**
@@ -135,5 +131,7 @@ public class OrderbookImpl implements IOrderbook{
      */
     @Override
     public void reset() {
+        clear();
+        currentOrderId = 0;
     }
 }

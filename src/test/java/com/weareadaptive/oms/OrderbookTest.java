@@ -125,15 +125,27 @@ public class OrderbookTest {
 
     @Test
     @DisplayName("Non-existing orderId is used to cancel a BID and returns the orderId and a NONE status")
-    public void cancelNonExistingBid() {}
+    public void cancelNonExistingBid() {
+        final var fakeId = 100;
+        final var cancelledBid = orderbook.cancelOrder(fakeId);
+        Assertions.assertEquals(fakeId, cancelledBid.getOrderId());
+        Assertions.assertEquals(Status.NONE, cancelledBid.getStatus());
+    }
 
     @Test
     @DisplayName("Non-existing orderId is used to cancel a ASK and returns the orderId and a NONE status")
-    public void cancelNonExistingAsk() {}
+    public void cancelNonExistingAsk() {
+        final var fakeId = 100;
+        final var cancelledAsk = orderbook.cancelOrder(fakeId);
+        // assert
+        Assertions.assertEquals(fakeId, cancelledAsk.getOrderId());
+        Assertions.assertEquals(Status.NONE, cancelledAsk.getStatus());
+    }
 
     @Test
     @DisplayName("All orderbook orders are cleared and should be empty when checked, orderId should not be reset.")
-    public void clearOrderbook() {}
+    public void clearOrderbook() {
+    }
 
     @Test
     @DisplayName("Entire orderbook state is reset, all states should be at initial values or empty.")
