@@ -5,7 +5,6 @@ public class Order implements Comparable<Order>
     final long orderId;
     final double price;
     long size;
-    Status status;
     public Order(long orderId, double price, long size)
     {
         this.orderId = orderId;
@@ -22,7 +21,7 @@ public class Order implements Comparable<Order>
     {
         var comparePrices = Double.compare(order.getPrice(), price);
         if (comparePrices == 0) {
-            return Double.compare(order.getOrderId(), orderId);
+            return -1 * Double.compare(order.getOrderId(), orderId);
         }
         return comparePrices;
     }

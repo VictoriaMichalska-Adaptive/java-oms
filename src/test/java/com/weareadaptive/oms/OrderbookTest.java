@@ -86,6 +86,56 @@ public class OrderbookTest {
     }
 
     @Test
+    @DisplayName("Multiple BIDs with the same price will be fulfilled in the order they were given")
+    public void multipleIdenticalBids() {
+        final var firstBid = orderbook.placeOrder(10, 10, Side.BID);
+        final var secondBid = orderbook.placeOrder(10, 15, Side.BID);
+        final var thirdBid = orderbook.placeOrder(10, 20, Side.BID);
+        final var completedAsk = orderbook.placeOrder(10, 10, Side.ASK);
+        final var cancelledSecondBid = orderbook.cancelOrder(secondBid.getOrderId());
+        final var cancelledThirdBid = orderbook.cancelOrder(thirdBid.getOrderId());
+        Assertions.assertEquals(Status.FILLED, completedAsk.getStatus());
+
+        // attempt to cancel
+        final var cancelledBid = orderbook.cancelOrder(firstBid.getOrderId());
+
+        // make sure first bid cannot have been cancelled because it has been fulfilled
+        Assertions.assertEquals(Status.NONE, cancelledBid.getStatus());
+        Assertions.assertEquals(firstBid.getOrderId(), cancelledBid.getOrderId());
+
+        // assert other bids were cancelled and therefore not fulfilled
+        Assertions.assertEquals(Status.CANCELLED, cancelledSecondBid.getStatus());
+        Assertions.assertEquals(secondBid.getOrderId(), cancelledSecondBid.getOrderId());
+        Assertions.assertEquals(Status.CANCELLED, cancelledThirdBid.getStatus());
+        Assertions.assertEquals(thirdBid.getOrderId(), cancelledThirdBid.getOrderId());
+    }
+
+    @Test
+    @DisplayName("Multiple ASKs with the same price will be fulfilled in the order they were given")
+    public void multipleIdenticalAsks() {
+        final var firstBid = orderbook.placeOrder(10, 10, Side.ASK);
+        final var secondBid = orderbook.placeOrder(10, 15, Side.ASK);
+        final var thirdBid = orderbook.placeOrder(10, 20, Side.ASK);
+        final var completedAsk = orderbook.placeOrder(10, 10, Side.BID);
+        final var cancelledSecondBid = orderbook.cancelOrder(secondBid.getOrderId());
+        final var cancelledThirdBid = orderbook.cancelOrder(thirdBid.getOrderId());
+        Assertions.assertEquals(Status.FILLED, completedAsk.getStatus());
+
+        // attempt to cancel
+        final var cancelledBid = orderbook.cancelOrder(firstBid.getOrderId());
+
+        // make sure first bid cannot have been cancelled because it has been fulfilled
+        Assertions.assertEquals(Status.NONE, cancelledBid.getStatus());
+        Assertions.assertEquals(firstBid.getOrderId(), cancelledBid.getOrderId());
+
+        // assert other bids were cancelled and therefore not fulfilled
+        Assertions.assertEquals(Status.CANCELLED, cancelledSecondBid.getStatus());
+        Assertions.assertEquals(secondBid.getOrderId(), cancelledSecondBid.getOrderId());
+        Assertions.assertEquals(Status.CANCELLED, cancelledThirdBid.getStatus());
+        Assertions.assertEquals(thirdBid.getOrderId(), cancelledThirdBid.getOrderId());
+    }
+
+    @Test
     @DisplayName("Crossing ASK that will be filled entirely is placed and returns its orderId and a FILLED status")
     public void placeFilledAsk() {
         // arrange
@@ -145,10 +195,43 @@ public class OrderbookTest {
     @Test
     @DisplayName("All orderbook orders are cleared and should be empty when checked, orderId should not be reset.")
     public void clearOrderbook() {
+        orderbook.placeOrder(100, 1, Side.ASK);
+        orderbook.placeOrder(100, 1, Side.ASK);
+        orderbook.placeOrder(100, 1, Side.ASK);
+        orderbook.placeOrder(1, 100, Side.BID);
+        orderbook.placeOrder(2, 100, Side.BID);
+        orderbook.placeOrder(3, 100, Side.BID);
+        orderbook.placeOrder(4, 100, Side.BID);
+        Assertions.assertEquals(3, orderbook.showAsks().size());
+        Assertions.assertEquals(4, orderbook.showBids().size());
+        final var currentId = orderbook.currentOrderId;
+
+        orderbook.clear();
+
+        Assertions.assertEquals(0, orderbook.showAsks().size());
+        Assertions.assertEquals(0, orderbook.showBids().size());
+        Assertions.assertEquals(currentId, orderbook.currentOrderId);
     }
 
     @Test
     @DisplayName("Entire orderbook state is reset, all states should be at initial values or empty.")
-    public void resetOrderbook() {}
+    public void resetOrderbook() {
+        orderbook.placeOrder(100, 1, Side.ASK);
+        orderbook.placeOrder(100, 1, Side.ASK);
+        orderbook.placeOrder(100, 1, Side.ASK);
+        orderbook.placeOrder(1, 100, Side.BID);
+        orderbook.placeOrder(2, 100, Side.BID);
+        orderbook.placeOrder(3, 100, Side.BID);
+        orderbook.placeOrder(4, 100, Side.BID);
+        Assertions.assertEquals(3, orderbook.showAsks().size());
+        Assertions.assertEquals(4, orderbook.showBids().size());
+        final var currentId = orderbook.currentOrderId;
+
+        orderbook.reset();
+
+        Assertions.assertEquals(0, orderbook.showAsks().size());
+        Assertions.assertEquals(0, orderbook.showBids().size());
+        Assertions.assertNotEquals(currentId, orderbook.currentOrderId);
+    }
 
 }

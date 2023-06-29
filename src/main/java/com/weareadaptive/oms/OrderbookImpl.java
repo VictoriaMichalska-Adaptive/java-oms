@@ -45,13 +45,14 @@ public class OrderbookImpl implements IOrderbook{
             }
             default -> throw new IllegalArgumentException();
         }
-        if ((orderList.isEmpty() || otherSideList.isEmpty()) || (orderList.first().getPrice() < newOrder.getPrice())) {
+
+        if ((orderList.isEmpty() || orderList.first().getPrice() < newOrder.getPrice())) {
             return findMatchingOrders(newOrder, orderList, otherSideList);
         }
         else {
             orderList.add(newOrder);
-
-            return new ExecutionResult(id, Status.RESTING);
+            activeIds.add(newOrder.getOrderId());
+            return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
         }
     }
 
@@ -70,44 +71,45 @@ public class OrderbookImpl implements IOrderbook{
             var order = iter.next();
             if (order.getPrice() > newOrder.getPrice()) continue;
             long sizeFulfilled;
-            if (totalSize > 0) {
-                var orderSize = order.getSize();
-                if (orderSize > totalSize) {
-                    sizeFulfilled = totalSize;
-                    order.setSize(orderSize - sizeFulfilled);
-                }
-                else {
-                    removeIdFromSystem(order.getOrderId());
-                    iter.remove();
-                    sizeFulfilled = orderSize;
-                }
-                totalSize -= sizeFulfilled;
+            var orderSize = order.getSize();
+            if (orderSize > totalSize)
+            {
+                sizeFulfilled = totalSize;
+                order.setSize(orderSize - sizeFulfilled);
+            } else {
+                activeIds.remove(order.getOrderId());
+                iter.remove();
+                sizeFulfilled = orderSize;
             }
-            else break;
+            totalSize -= sizeFulfilled;
+            if (totalSize == 0) break;
         }
 
-        if (totalSize == 0) { return new ExecutionResult(newOrder.getOrderId(), Status.FILLED); }
-        else if (totalSize == newOrder.getSize()) return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
-        else { return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL); }
-    }
-
-    private void removeIdFromSystem(long orderId)
-    {
-        activeIds.remove(orderId);
+        if (totalSize == 0) {
+            activeIds.remove(newOrder.getOrderId());
+            return new ExecutionResult(newOrder.getOrderId(), Status.FILLED);
+        }
+        else if (totalSize == newOrder.getSize()) {
+            orderList.add(newOrder);
+            return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
+        }
+        else {
+            orderList.add(newOrder);
+            return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL);
+        }
     }
 
     /**
      * * Implement Cancel Order logic
      *  - Cancels order provided the orderId
-     *  - Returns orderId and status (CANCELLED, NONE)
+     *  - Returns orderId and status (CANCELLED)
      */
-    // todo: actually cancel the order by moving it from the hashlist lol
     @Override
     public ExecutionResult cancelOrder(long orderId) {
         if (!activeIds.contains(orderId)) {
             return new ExecutionResult(orderId, Status.NONE);
         }
-        removeIdFromSystem(orderId);
+        activeIds.remove(orderId);
         return new ExecutionResult(orderId, Status.CANCELLED);
     }
 
@@ -133,5 +135,15 @@ public class OrderbookImpl implements IOrderbook{
     public void reset() {
         clear();
         currentOrderId = 0;
+    }
+
+    protected TreeSet<Order> showBids()
+    {
+        return bids;
+    }
+
+    protected TreeSet<Order> showAsks()
+    {
+        return asks;
     }
 }
