@@ -6,13 +6,14 @@ import com.weareadaptive.oms.util.Side;
 import com.weareadaptive.oms.util.Status;
 
 import java.util.HashSet;
+import java.util.NavigableSet;
 import java.util.TreeSet;
 
 public class OrderbookImpl implements IOrderbook{
-    long currentOrderId = 0;
-    protected HashSet<Long> activeIds = new HashSet<>();
-    protected TreeSet<Order> asks = new TreeSet<>();
-    protected TreeSet<Order> bids = new TreeSet<>();
+    private long currentOrderId = 0;
+    private final HashSet<Long> activeIds = new HashSet<>();
+    private final TreeSet<Order> asks = new TreeSet<>();
+    private final TreeSet<Order> bids = new TreeSet<>();
 
     /**
      * * Implement Place Order logic
@@ -127,5 +128,29 @@ public class OrderbookImpl implements IOrderbook{
     public void reset() {
         clear();
         currentOrderId = 0;
+    }
+
+    public NavigableSet<Order> getAsksPriceAscending() {
+        return asks.descendingSet();
+    }
+
+    public HashSet<Long> getActiveIds()
+    {
+        return activeIds;
+    }
+
+    public long getCurrentOrderId()
+    {
+        return currentOrderId;
+    }
+
+    public TreeSet<Order> getAsks()
+    {
+        return asks;
+    }
+
+    public TreeSet<Order> getBids()
+    {
+        return bids;
     }
 }
