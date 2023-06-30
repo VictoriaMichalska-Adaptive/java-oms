@@ -235,14 +235,14 @@ public class OrderbookTest {
         orderbook.placeOrder(2, 100, Side.BID);
         orderbook.placeOrder(3, 100, Side.BID);
         orderbook.placeOrder(4, 100, Side.BID);
-        Assertions.assertEquals(3, orderbook.showAsks().size());
-        Assertions.assertEquals(4, orderbook.showBids().size());
+        Assertions.assertEquals(3, orderbook.asks.size());
+        Assertions.assertEquals(4, orderbook.bids.size());
         final var currentId = orderbook.currentOrderId;
 
         orderbook.clear();
 
-        Assertions.assertEquals(0, orderbook.showAsks().size());
-        Assertions.assertEquals(0, orderbook.showBids().size());
+        Assertions.assertEquals(0, orderbook.asks.size());
+        Assertions.assertEquals(0, orderbook.bids.size());
         Assertions.assertTrue(orderbook.activeIds.isEmpty());
         Assertions.assertEquals(currentId, orderbook.currentOrderId);
     }
@@ -257,14 +257,14 @@ public class OrderbookTest {
         orderbook.placeOrder(2, 100, Side.BID);
         orderbook.placeOrder(3, 100, Side.BID);
         orderbook.placeOrder(4, 100, Side.BID);
-        Assertions.assertEquals(3, orderbook.showAsks().size());
-        Assertions.assertEquals(4, orderbook.showBids().size());
+        Assertions.assertEquals(3, orderbook.asks.size());
+        Assertions.assertEquals(4, orderbook.bids.size());
         final var currentId = orderbook.currentOrderId;
 
         orderbook.reset();
 
-        Assertions.assertEquals(0, orderbook.showAsks().size());
-        Assertions.assertEquals(0, orderbook.showBids().size());
+        Assertions.assertEquals(0, orderbook.asks.size());
+        Assertions.assertEquals(0, orderbook.bids.size());
         Assertions.assertTrue(orderbook.activeIds.isEmpty());
         Assertions.assertNotEquals(currentId, orderbook.currentOrderId);
     }

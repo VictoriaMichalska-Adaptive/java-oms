@@ -128,14 +128,4 @@ public class OrderbookImpl implements IOrderbook{
         clear();
         currentOrderId = 0;
     }
-
-    protected TreeSet<Order> showBids()
-    {
-        return bids;
-    }
-
-    protected TreeSet<Order> showAsks()
-    {
-        return asks;
-    }
 }
