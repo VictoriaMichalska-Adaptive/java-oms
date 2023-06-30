@@ -3,6 +3,7 @@ package com.weareadaptive.oms.ws;
 import com.weareadaptive.oms.OrderbookImpl;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.ServerWebSocket;
+import io.vertx.core.json.JsonObject;
 
 public class WebSocketServer extends AbstractVerticle
 {
@@ -33,6 +34,21 @@ public class WebSocketServer extends AbstractVerticle
      */
     private void WSHandler(final ServerWebSocket ws)
     {
+        System.out.println("ask for help");
+        ws.handler(event -> {
+            var jsonEvent = event.toJsonObject();
+            if (jsonEvent.containsKey("method")) {
+                final var eventMethod = jsonEvent.getString("method");
+                switch (eventMethod)
+                {
+                    case "place" -> WSPlaceOrder(ws, jsonEvent);
+                    case "cancel" -> WSCancelOrder(ws, jsonEvent);
+                    case "clear" -> WSClearOrderbook(ws, jsonEvent);
+                    case "reset" -> WSResetOrderbook(ws, jsonEvent);
+                    default -> throw new IllegalArgumentException("Method does not exist: ".concat(eventMethod));
+                }
+            }
+        });
     }
 
     /**
@@ -55,8 +71,9 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "FILLED"
      * }
      */
-    private void WSPlaceOrder(final ServerWebSocket ws)
+    private void WSPlaceOrder(final ServerWebSocket ws, JsonObject jsonEvent)
     {
+        System.out.println("miss, id like to place an order");
     }
 
     /**
@@ -74,7 +91,7 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "CANCELLED"
      * }
      */
-    private void WSCancelOrder(final ServerWebSocket ws)
+    private void WSCancelOrder(final ServerWebSocket ws, JsonObject jsonEvent)
     {
     }
 
@@ -91,7 +108,7 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSClearOrderbook(final ServerWebSocket ws)
+    private void WSClearOrderbook(final ServerWebSocket ws, JsonObject jsonEvent)
     {
     }
 
@@ -108,7 +125,7 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSResetOrderbook(final ServerWebSocket ws)
+    private void WSResetOrderbook(final ServerWebSocket ws, JsonObject jsonEvent)
     {
     }
 }
