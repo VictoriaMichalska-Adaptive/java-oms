@@ -10,9 +10,9 @@ import java.util.TreeSet;
 
 public class OrderbookImpl implements IOrderbook{
     long currentOrderId = 0;
-    HashSet<Long> activeIds = new HashSet<>();
-    TreeSet<Order> asks = new TreeSet<>();
-    TreeSet<Order> bids = new TreeSet<>();
+    protected HashSet<Long> activeIds = new HashSet<>();
+    protected TreeSet<Order> asks = new TreeSet<>();
+    protected TreeSet<Order> bids = new TreeSet<>();
 
     /**
      * * Implement Place Order logic
@@ -63,7 +63,11 @@ public class OrderbookImpl implements IOrderbook{
         while (iter.hasNext())
         {
             var orderFromIterator = iter.next();
-            if (orderFromIterator.getPrice() > newOrder.getPrice()) continue;
+            if (orderList == asks)
+            {
+                if (orderFromIterator.getPrice() < newOrder.getPrice()) continue;
+            }
+            else if (orderFromIterator.getPrice() > newOrder.getPrice()) continue;
             long sizeFulfilled;
             var orderSize = orderFromIterator.getSize();
             if (orderSize > totalSize)

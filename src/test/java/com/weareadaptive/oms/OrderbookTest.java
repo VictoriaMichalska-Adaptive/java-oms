@@ -30,6 +30,30 @@ public class OrderbookTest {
     }
 
     @Test
+    @DisplayName("Given 3 ASKs, when 1 BID is placed that meets the criteria of the asks, they are all fulfilled")
+    public void multipleBidsBeingFulfilledFromOneAsk() {
+        orderbook.placeOrder(10, 1, Side.ASK);
+        orderbook.placeOrder(9, 2, Side.ASK);
+        orderbook.placeOrder(8, 3, Side.ASK);
+        Assertions.assertEquals(3, orderbook.asks.size());
+        orderbook.placeOrder(11, 6, Side.BID);
+        Assertions.assertEquals(0, orderbook.bids.size());
+        Assertions.assertEquals(0, orderbook.asks.size());
+    }
+
+    @Test
+    @DisplayName("Given 3 BIDs, when 1 ASK is placed that meets the criteria of the bids, they are all fulfilled")
+    public void multipleAsksBeingFulfilledFromOneBid() {
+        orderbook.placeOrder(10, 1, Side.BID);
+        orderbook.placeOrder(9, 2, Side.BID);
+        orderbook.placeOrder(8, 3, Side.BID);
+        Assertions.assertEquals(3, orderbook.bids.size());
+        orderbook.placeOrder(7, 6, Side.ASK);
+        Assertions.assertEquals(0, orderbook.asks.size());
+        Assertions.assertEquals(0, orderbook.bids.size());
+    }
+
+    @Test
     @DisplayName("Non-crossing ASK is placed, and returns its orderId and a RESTING status")
     public void placeRestingAsk() {
         // arrange
@@ -63,7 +87,7 @@ public class OrderbookTest {
     @DisplayName("Crossing ASK that will be partially filled is placed and returns its orderId and a PARTIAL status")
     public void placePartialAsk() {
         // arrange
-        orderbook.placeOrder(5, 10, Side.BID); // bid
+        orderbook.placeOrder(15, 10, Side.BID); // bid
 
         // act
         final var returnedAsk = orderbook.placeOrder(10, 15, Side.ASK); // crossing ask
@@ -146,7 +170,7 @@ public class OrderbookTest {
         orderbook.placeOrder(10, 10, Side.BID); // bid
 
         // act
-        final var returnedAsk = orderbook.placeOrder(15, 5, Side.ASK); // crossing ask
+        final var returnedAsk = orderbook.placeOrder(9, 5, Side.ASK); // crossing ask
 
         // assert
         Assertions.assertTrue(returnedAsk.getOrderId() > 0);
