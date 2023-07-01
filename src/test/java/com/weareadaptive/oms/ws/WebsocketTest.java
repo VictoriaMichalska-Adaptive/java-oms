@@ -1,12 +1,10 @@
 package com.weareadaptive.oms.ws;
 
 import com.weareadaptive.oms.util.Side;
+import com.weareadaptive.oms.util.Status;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
-import io.vertx.core.http.HttpClientResponse;
-import io.vertx.core.http.HttpHeaders;
-import io.vertx.core.http.HttpMethod;
 import io.vertx.core.json.JsonObject;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
@@ -18,7 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(VertxExtension.class)
@@ -63,24 +61,21 @@ public class WebsocketTest
          * * Sends websocket request to server to place order
          *   Should receive a response containing corresponding orderId and status
          */
-        JsonObject orderRequest = new JsonObject();
-        orderRequest.put("method", "place");
-        OrderDTO order = new OrderDTO(10, 10, Side.ASK);
-        orderRequest.put("order", JsonObject.mapFrom(order));
-        Buffer request = Buffer.buffer(orderRequest.encode());
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderRequest = new JsonObject();
+            orderRequest.put("method", "place");
+            OrderDTO order = new OrderDTO(10, 15, Side.ASK);
+            orderRequest.put("order", JsonObject.mapFrom(order));
+            Buffer request = Buffer.buffer(orderRequest.encode());
+            websocket.write(request);
 
-        vertxClient.request(HttpMethod.POST, 8080, "localhost", "/")
-                .compose(httpClientRequest -> {
-                    httpClientRequest
-                        .putHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-                        .putHeader(HttpHeaders.CONTENT_LENGTH, String.valueOf(request.length()));
-
-                        return httpClientRequest.send(request).compose(HttpClientResponse::body);
-                })
-                .onComplete(testContext.succeeding(buffer -> testContext.verify(() -> {
-                    assertFalse(buffer.toString().isEmpty());
-                    testContext.completeNow();
-                })));
+            websocket.handler(data -> {
+                final var newExecution = data.toJsonObject().mapTo(ExecutionResultDTO.class);
+                assertSame(newExecution.status(), Status.RESTING);
+                assertTrue(newExecution.orderId() >= 0);
+                testContext.completeNow();
+            });
+        });
         assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
     }
 

@@ -34,7 +34,6 @@ public class WebSocketServer extends AbstractVerticle
      */
     private void WSHandler(final ServerWebSocket ws)
     {
-        System.out.println("ask for help");
         ws.handler(event -> {
             var jsonEvent = event.toJsonObject();
             if (jsonEvent.containsKey("method")) {
@@ -73,7 +72,9 @@ public class WebSocketServer extends AbstractVerticle
      */
     private void WSPlaceOrder(final ServerWebSocket ws, JsonObject jsonEvent)
     {
-        System.out.println("miss, id like to place an order");
+        final var order = jsonEvent.getJsonObject("order").mapTo(OrderDTO.class);
+        final var executionResult = orderbook.placeOrder(order.price(), order.size(), order.side());
+        ws.write(JsonObject.mapFrom(executionResult).toBuffer());
     }
 
     /**
