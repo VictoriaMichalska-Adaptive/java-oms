@@ -1,4 +1,4 @@
-package com.weareadaptive.oms.ws;
+package com.weareadaptive.oms.ws.dto;
 
 import com.weareadaptive.oms.util.Status;
 

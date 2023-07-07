@@ -1,6 +1,8 @@
 package com.weareadaptive.oms.ws;
 
 import com.weareadaptive.oms.OrderbookImpl;
+import com.weareadaptive.oms.ws.dto.OrderDTO;
+import com.weareadaptive.oms.ws.exception.MissingFieldException;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.core.json.JsonObject;
@@ -38,13 +40,19 @@ public class WebSocketServer extends AbstractVerticle
             var jsonEvent = event.toJsonObject();
             if (jsonEvent.containsKey("method")) {
                 final var eventMethod = jsonEvent.getString("method");
-                switch (eventMethod)
+                try
                 {
-                    case "place" -> WSPlaceOrder(ws, jsonEvent);
-                    case "cancel" -> WSCancelOrder(ws, jsonEvent);
-                    case "clear" -> WSClearOrderbook(ws, jsonEvent);
-                    case "reset" -> WSResetOrderbook(ws, jsonEvent);
-                    default -> throw new IllegalArgumentException("Method does not exist: ".concat(eventMethod));
+                    switch (eventMethod)
+                    {
+                        case "place" -> WSPlaceOrder(ws, jsonEvent);
+                        case "cancel" -> WSCancelOrder(ws, jsonEvent);
+                        case "clear" -> WSClearOrderbook(ws);
+                        case "reset" -> WSResetOrderbook(ws);
+                        default -> throw new MissingFieldException("method");
+                    }
+                }
+                catch (MissingFieldException missingFieldException) {
+                    ws.write(JsonObject.of("code", "400", "missingField", missingFieldException.getMessage()).toBuffer());
                 }
             }
         });
@@ -72,9 +80,15 @@ public class WebSocketServer extends AbstractVerticle
      */
     private void WSPlaceOrder(final ServerWebSocket ws, JsonObject jsonEvent)
     {
-        final var order = jsonEvent.getJsonObject("order").mapTo(OrderDTO.class);
-        final var executionResult = orderbook.placeOrder(order.price(), order.size(), order.side());
-        ws.write(JsonObject.mapFrom(executionResult).toBuffer());
+        try
+        {
+            final var order = jsonEvent.getJsonObject("order").mapTo(OrderDTO.class);
+            final var executionResult = orderbook.placeOrder(order.price(), order.size(), order.side());
+            ws.write(JsonObject.mapFrom(executionResult).toBuffer());
+        }
+        catch (NullPointerException e) {
+            throw new MissingFieldException("order");
+        }
     }
 
     /**
@@ -94,6 +108,10 @@ public class WebSocketServer extends AbstractVerticle
      */
     private void WSCancelOrder(final ServerWebSocket ws, JsonObject jsonEvent)
     {
+        final var orderId = jsonEvent.getLong("orderId");
+        if (orderId == null) throw new MissingFieldException("orderId");
+        final var executionResult = orderbook.cancelOrder(orderId);
+        ws.write(JsonObject.mapFrom(executionResult).toBuffer());
     }
 
     /**
@@ -109,8 +127,10 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSClearOrderbook(final ServerWebSocket ws, JsonObject jsonEvent)
+    private void WSClearOrderbook(final ServerWebSocket ws)
     {
+        orderbook.clear();
+        ws.write(JsonObject.of("status", "SUCCESS").toBuffer());
     }
 
     /**
@@ -126,7 +146,9 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSResetOrderbook(final ServerWebSocket ws, JsonObject jsonEvent)
+    private void WSResetOrderbook(final ServerWebSocket ws)
     {
+        orderbook.reset();
+        ws.write(JsonObject.of("status", "SUCCESS").toBuffer());
     }
 }
