@@ -51,8 +51,8 @@ public class WebSocketServer extends AbstractVerticle
                         default -> throw new MissingFieldException("method");
                     }
                 }
-                catch (MissingFieldException missingFieldException) {
-                    ws.write(JsonObject.of("code", "400", "missingField", missingFieldException.getMessage()).toBuffer());
+                catch (MissingFieldException | ClassCastException missingFieldException) {
+                    ws.write(JsonObject.of("code", "400").toBuffer());
                 }
             }
         });

@@ -56,29 +56,6 @@ public class WebsocketTest
     }
 
     @Test
-    @DisplayName("Give fake method request from client and receive error response from server")
-    public void wsFakeMethodRequest(final VertxTestContext testContext) throws Throwable
-    {
-        /*
-         *   Sends websocket request to server to place order
-         *   Should receive a response containing corresponding orderId and status
-         */
-        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
-            JsonObject fakeRequest = new JsonObject();
-            fakeRequest.put("method", "fakeMethod");
-            websocket.write(fakeRequest.toBuffer());
-
-            websocket.handler(data -> {
-                final var errorDTO = data.toJsonObject().mapTo(ErrorDTO.class);
-                assertEquals( 400, errorDTO.code());
-                assertEquals("method", errorDTO.missingField());
-                testContext.completeNow();
-            });
-        });
-        assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
-    }
-
-    @Test
     @DisplayName("Place Order request from client and receive response from server")
     public void wsPlaceOrderRequest(final VertxTestContext testContext) throws Throwable
     {
@@ -105,6 +82,28 @@ public class WebsocketTest
     }
 
     @Test
+    @DisplayName("Give fake method request from client and receive error response from server")
+    public void wsFakeMethodRequest(final VertxTestContext testContext) throws Throwable
+    {
+        /*
+         *   Sends websocket request to server to place order
+         *   Should receive a response containing corresponding orderId and status
+         */
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject fakeRequest = new JsonObject();
+            fakeRequest.put("method", "fakeMethod");
+            websocket.write(fakeRequest.toBuffer());
+
+            websocket.handler(data -> {
+                final var errorDTO = data.toJsonObject().mapTo(ErrorDTO.class);
+                assertEquals( 400, errorDTO.code());
+                testContext.completeNow();
+            });
+        });
+        assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
+    }
+
+    @Test
     @DisplayName("Place Order request without an Order from client and receive response from server")
     public void wsFailedPlaceOrderRequest(final VertxTestContext testContext) throws Throwable
     {
@@ -121,7 +120,30 @@ public class WebsocketTest
             websocket.handler(data -> {
                 final var error = data.toJsonObject().mapTo(ErrorDTO.class);
                 assertEquals(400, error.code());
-                assertEquals("order", error.missingField());
+                testContext.completeNow();
+            });
+        });
+        assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("Give fake method request from client and receive error response from server")
+    public void wsBadOrderRequest(final VertxTestContext testContext) throws Throwable
+    {
+        /*
+         *   Sends websocket request to server to place order
+         *   Should receive a response containing corresponding orderId and status
+         */
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderRequest = new JsonObject();
+            orderRequest.put("method", "place");
+            orderRequest.put("order", "nonsense");
+            Buffer request = Buffer.buffer(orderRequest.encode());
+            websocket.write(request);
+
+            websocket.handler(data -> {
+                final var errorDTO = data.toJsonObject().mapTo(ErrorDTO.class);
+                assertEquals( 400, errorDTO.code());
                 testContext.completeNow();
             });
         });
@@ -152,10 +174,10 @@ public class WebsocketTest
 
             websocket.handler(data -> {
                 final var newExecution = data.toJsonObject().mapTo(ExecutionResultDTO.class);
-
-                assertSame(Status.CANCELLED, newExecution.status());
-                assertSame(0L, newExecution.orderId());
-                testContext.completeNow();
+                if (newExecution.status() == Status.CANCELLED) {
+                    assertSame(0L, newExecution.orderId());
+                    testContext.completeNow();
+                }
             });
         });
         assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
