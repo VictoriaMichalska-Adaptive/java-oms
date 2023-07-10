@@ -1,0 +1,13 @@
+#!/bin/bash
+
+gradle build
+
+#Ensure not using cached builds
+docker builder prune -a
+
+#Build docker images for client and node
+docker build -f Dockerfile.client -t aeron-cluster-client .
+docker build -f Dockerfile.node -t aeron-cluster-node .
+
+#Run docker compose
+docker-compose up

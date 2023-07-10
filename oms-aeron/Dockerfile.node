@@ -1,0 +1,9 @@
+FROM openjdk:17-oracle
+
+ARG TYPE
+
+WORKDIR /app
+
+COPY build/libs/aeron-oms-*-SNAPSHOT.jar aeron-cluster.jar
+
+CMD ["java", "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED" ,"-cp", "aeron-cluster.jar", "com.weareadaptive.cluster.ClusterMain"]

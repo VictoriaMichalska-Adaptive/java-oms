@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  node0:
+    image: aeron-cluster-node
+    shm_size: 1g
+    volumes:
+      - Aeron:/app
+    container_name: node0
+    environment:
+      - CLUSTER_ADDRESSES=172.20.0.2,172.20.0.3,172.20.0.4
+      - CLUSTER_NODE=0
+      - EGRESS_CHANNEL=aeron:udp?endpoint=172.20.0.5:0
+    networks:
+      internal_bus:
+        ipv4_address: 172.20.0.2
+
+  node1:
+    image: aeron-cluster-node
+    shm_size: 1g
+    volumes:
+      - Aeron:/app
+    container_name: node1
+    environment:
+      - CLUSTER_ADDRESSES=172.20.0.2,172.20.0.3,172.20.0.4
+      - CLUSTER_NODE=1
+      - EGRESS_CHANNEL=aeron:udp?endpoint=172.20.0.5:0
+    networks:
+      internal_bus:
+        ipv4_address: 172.20.0.3
+
+  node2:
+    image: aeron-cluster-node
+    shm_size: 1g
+    volumes:
+      - Aeron:/app
+    container_name: node2
+    environment:
+      - CLUSTER_ADDRESSES=172.20.0.2,172.20.0.3,172.20.0.4
+      - CLUSTER_NODE=2
+      - EGRESS_CHANNEL=aeron:udp?endpoint=172.20.0.5:0
+    networks:
+      internal_bus:
+        ipv4_address: 172.20.0.4
+
+  client:
+    image: aeron-cluster-client
+    shm_size: 1g
+    volumes:
+      - Aeron:/app
+    ports:
+      - "8080:8080/tcp"
+      - "8080:8080/udp"
+    container_name: client
+    environment:
+      - CLUSTER_ADDRESSES=172.20.0.2,172.20.0.3,172.20.0.4
+      - EGRESS_CHANNEL=aeron:udp?endpoint=172.20.0.5:0
+    networks:
+      internal_bus:
+        ipv4_address: 172.20.0.5
+
+volumes:
+  Aeron:
+
+networks:
+  internal_bus:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: 'true'
+      com.docker.network.driver.mtu: 9000
+      com.docker.network.enable_ipv6: 'false'
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.20.0.0/24"
