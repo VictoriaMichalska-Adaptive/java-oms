@@ -14,7 +14,7 @@ public class OMSService
 
     private void placeOrder(final ClientSession session, final DirectBuffer buffer, final int offset)
     {
-        /**
+        /*
          * * Receive Ingress binary encoding and place order in Orderbook
          *      - Decode buffer
          *      - Perform business logic
@@ -25,7 +25,7 @@ public class OMSService
 
     private void cancelOrder(final ClientSession session, final DirectBuffer buffer, final int offset)
     {
-        /**
+        /*
          * * Receive Ingress binary encoding and cancel order in Orderbook
          *      - Decode buffer
          *      - Perform business logic
@@ -36,7 +36,7 @@ public class OMSService
 
     private void clearOrderbook(final ClientSession session, final DirectBuffer buffer, final int offset)
     {
-        /**
+        /*
          * * Receive Ingress binary encoding and clear Orderbook
          *      - Decode buffer
          *      - Perform business logic
@@ -47,7 +47,7 @@ public class OMSService
 
     private void resetOrderbook(final ClientSession session, final DirectBuffer buffer, final int offset)
     {
-        /**
+        /*
          * * Receive Ingress binary encoding and reset Orderbook
          *      - Decode buffer
          *      - Perform business logic
@@ -58,7 +58,7 @@ public class OMSService
 
     public void onTakeSnapshot()
     {
-        /**
+        /*
          * * Encode current orderbook state and offer to SnapshotPublication
          *      - Convert data structures in Orderbook for encoding
          *      - Encode Orderbook state
@@ -68,7 +68,7 @@ public class OMSService
 
     public void onRestoreSnaptshot()
     {
-        /**
+        /*
          * * Decode Snapshot Image and restore Orderbook state
          *      - Decode Snapshot Image encoding into appropriate data structures
          *      - Restore into Orderbook state
