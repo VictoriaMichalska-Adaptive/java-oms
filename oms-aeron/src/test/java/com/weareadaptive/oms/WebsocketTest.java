@@ -1,11 +1,10 @@
-package com.weareadaptive.oms.ws;
+package com.weareadaptive.oms;
 
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.oms.util.Status;
-import com.weareadaptive.cluster.services.oms.ws.WebSocketServer;
-import com.weareadaptive.cluster.services.oms.ws.dto.ErrorDTO;
-import com.weareadaptive.cluster.services.oms.ws.dto.ExecutionResultDTO;
-import com.weareadaptive.cluster.services.oms.ws.dto.OrderDTO;
+import com.weareadaptive.gateway.ws.dto.ErrorDTO;
+import com.weareadaptive.gateway.ws.dto.ExecutionResultDTO;
+import com.weareadaptive.gateway.ws.dto.OrderDTO;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
@@ -28,12 +27,13 @@ public class WebsocketTest
 
     private Vertx vertx;
     private HttpClient vertxClient;
+    private Deployment deployment;
 
     @BeforeEach
-    void setUp(final VertxTestContext testContext)
+    void setUp(final VertxTestContext testContext) throws InterruptedException
     {
-        vertx = Vertx.vertx();
-        vertx.deployVerticle(new WebSocketServer(), testContext.succeeding(id -> testContext.completeNow()));
+        deployment = new Deployment();
+        deployment.startGateway();
         vertxClient = vertx.createHttpClient();
     }
 
@@ -41,7 +41,7 @@ public class WebsocketTest
     void tearDown()
     {
         vertxClient.close();
-        vertx.close();
+        deployment.shutdownCluster();
     }
 
     @Test

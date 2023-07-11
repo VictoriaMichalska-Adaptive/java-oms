@@ -1,4 +1,4 @@
-package com.weareadaptive.cluster.services.oms.ws.exception;
+package com.weareadaptive.gateway.ws.exception;
 
 public class MissingFieldException extends RuntimeException
 {

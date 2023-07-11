@@ -1,4 +1,4 @@
-package com.weareadaptive.cluster.services.oms.ws.dto;
+package com.weareadaptive.gateway.ws.dto;
 
 import com.weareadaptive.cluster.services.oms.util.Side;
 
