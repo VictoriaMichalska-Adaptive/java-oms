@@ -5,6 +5,7 @@ public class Order implements Comparable<Order>
     final long orderId;
     final double price;
     long size;
+
     public Order(long orderId, double price, long size)
     {
         this.orderId = orderId;

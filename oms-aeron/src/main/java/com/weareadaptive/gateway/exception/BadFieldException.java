@@ -1,10 +1,10 @@
-package com.weareadaptive.gateway.ws.exception;
+package com.weareadaptive.gateway.exception;
 
-public class MissingFieldException extends RuntimeException
+public class BadFieldException extends RuntimeException
 {
     private final String missingField;
 
-    public MissingFieldException(final String missingField)
+    public BadFieldException(final String missingField)
     {
         this.missingField = missingField;
     }

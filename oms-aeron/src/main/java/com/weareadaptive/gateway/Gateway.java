@@ -6,6 +6,8 @@ import com.weareadaptive.gateway.ws.WebSocketServer;
 import io.aeron.cluster.client.AeronCluster;
 import io.aeron.driver.MediaDriver;
 import io.aeron.driver.ThreadingMode;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import org.agrona.ErrorHandler;
 import org.agrona.concurrent.BusySpinIdleStrategy;
@@ -31,12 +33,25 @@ public class Gateway
     private static Thread keepClusterAlive;
     private static boolean isActive;
     private int initLeader = -1;
+    private static Handler<AsyncResult<String>> testContext;
+
+    public Gateway(Handler<AsyncResult<String>> testContext)
+    {
+        Gateway.testContext = testContext;
+    }
+    public Gateway() {}
 
     private static void startWSServer()
     {
         vertx = Vertx.vertx();
         webSocketServer = new WebSocketServer(clientIngressSender, clientEgressListener);
-        vertx.deployVerticle(webSocketServer);
+        if (testContext != null)
+        {
+            vertx.deployVerticle(webSocketServer, testContext);
+        }
+        else {
+            vertx.deployVerticle(webSocketServer);
+        }
         LOGGER.info("Websocket started...");
     }
 

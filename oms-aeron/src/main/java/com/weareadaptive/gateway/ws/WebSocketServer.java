@@ -1,17 +1,26 @@
 package com.weareadaptive.gateway.ws;
 
+import com.weareadaptive.cluster.services.util.ServiceName;
+import com.weareadaptive.cluster.services.oms.util.Method;
+import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.gateway.client.ClientEgressListener;
 import com.weareadaptive.gateway.client.ClientIngressSender;
-import com.weareadaptive.gateway.ws.dto.OrderDTO;
-import com.weareadaptive.gateway.ws.exception.MissingFieldException;
+import com.weareadaptive.gateway.exception.BadFieldException;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.core.json.JsonObject;
+import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.UnsafeBuffer;
+
+import java.nio.ByteBuffer;
+
+import static com.weareadaptive.util.Decoder.*;
 
 public class WebSocketServer extends AbstractVerticle
 {
     ClientIngressSender clientIngressSender;
     ClientEgressListener clientEgressListener;
+    private long id = 0L;
 
     public WebSocketServer(final ClientIngressSender clientIngressSender,
                            final ClientEgressListener clientEgressListener)
@@ -51,14 +60,14 @@ public class WebSocketServer extends AbstractVerticle
                 final var eventMethod = jsonEvent.getString("method");
                 switch (eventMethod)
                 {
-                    case "place" -> WSPlaceOrder(ws, jsonEvent.getJsonObject("order"));
-                    case "cancel" -> WSCancelOrder(ws, jsonEvent.getLong("orderId"));
-                    case "clear" -> WSClearOrderbook(ws);
-                    case "reset" -> WSResetOrderbook(ws);
-                    default -> throw new MissingFieldException("method");
+                    case "place" -> WSPlaceOrder(ws, ++id, jsonEvent.getJsonObject("order"));
+                    case "cancel" -> WSCancelOrder(ws, ++id, jsonEvent.getLong("orderId"));
+                    case "clear" -> WSClearOrderbook(ws, ++id);
+                    case "reset" -> WSResetOrderbook(ws, ++id);
+                    default -> throw new BadFieldException("method");
                 }
             }
-            catch (MissingFieldException | ClassCastException exception)
+            catch (BadFieldException | ClassCastException exception)
             {
                 ws.write(JsonObject.of("code", "400").toBuffer());
             }
@@ -85,18 +94,21 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "FILLED"
      * }
      */
-    private void WSPlaceOrder(final ServerWebSocket ws, JsonObject jsonEvent)
+    private void WSPlaceOrder(final ServerWebSocket ws, long messageId, JsonObject jsonEvent)
     {
-        try
-        {
-            final var order = jsonEvent.mapTo(OrderDTO.class);
-            // todo: replace with aeron call
-            // final var executionResult = orderbook.placeOrder(order.price(), order.size(), order.side());
-            // ws.write(JsonObject.mapFrom(executionResult).toBuffer());
-        }
-        catch (NullPointerException e) {
-            throw new MissingFieldException("order");
-        }
+        if (jsonEvent == null) { throw new BadFieldException("order"); }
+        if (jsonEvent.getDouble("price") == null) { throw new BadFieldException("price"); }
+        if (jsonEvent.getLong("size") == null) { throw new BadFieldException("size"); }
+        if (jsonEvent.getString("side") == null) { throw new BadFieldException("side"); }
+
+        clientEgressListener.addWebsocket(messageId, ws, Method.PLACE);
+
+        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE + ORDER_SIZE));
+        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.PLACE, id), 0, HEADER_SIZE);
+        buffer.putBytes(HEADER_SIZE, encodeOrderRequest(jsonEvent.getDouble("price"),
+                jsonEvent.getLong("size"), Side.valueOf(jsonEvent.getString("side"))), 0, ORDER_SIZE);
+
+        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE + ORDER_SIZE);
     }
 
     /**
@@ -114,12 +126,18 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "CANCELLED"
      * }
      */
-    private void WSCancelOrder(final ServerWebSocket ws, Long orderId)
+    private void WSCancelOrder(final ServerWebSocket ws, Long messageId, Long orderId)
     {
-        if (orderId == null) throw new MissingFieldException("orderId");
-        // todo: replace with aeron call
-        // final var executionResult = orderbook.cancelOrder(orderId);
-        // ws.write(JsonObject.mapFrom(executionResult).toBuffer());
+        if (orderId == null) throw new BadFieldException("orderId");
+        System.out.println("messageId " + messageId);
+        System.out.println("orderId " + orderId);
+
+        clientEgressListener.addWebsocket(messageId, ws, Method.CANCEL);
+        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE + ID_SIZE));
+        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.CANCEL, messageId), 0, HEADER_SIZE);
+        buffer.putBytes(HEADER_SIZE, encodeId(orderId), 0, ID_SIZE);
+
+        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE + ID_SIZE);
     }
 
     /**
@@ -135,11 +153,13 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSClearOrderbook(final ServerWebSocket ws)
+    private void WSClearOrderbook(final ServerWebSocket ws, final Long messageId)
     {
-        // todo: replace with aeron call
-        //orderbook.clear();
-        ws.write(JsonObject.of("status", "SUCCESS").toBuffer());
+        clientEgressListener.addWebsocket(messageId, ws, Method.CLEAR);
+        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE));
+        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.CLEAR, id), 0, HEADER_SIZE);
+
+        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE);
     }
 
     /**
@@ -155,10 +175,13 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSResetOrderbook(final ServerWebSocket ws)
+    private void WSResetOrderbook(final ServerWebSocket ws, final Long messageId)
     {
-        // todo: replace with aeron call
-        // orderbook.reset();
-        ws.write(JsonObject.of("status", "SUCCESS").toBuffer());
+        clientEgressListener.addWebsocket(messageId, ws, Method.RESET);
+
+        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE));
+        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.RESET, id), 0, HEADER_SIZE);
+
+        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE);
     }
 }

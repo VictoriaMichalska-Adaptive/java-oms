@@ -2,10 +2,9 @@ package com.weareadaptive.oms;
 
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.oms.util.Status;
-import com.weareadaptive.gateway.ws.dto.ErrorDTO;
-import com.weareadaptive.gateway.ws.dto.ExecutionResultDTO;
-import com.weareadaptive.gateway.ws.dto.OrderDTO;
-import io.vertx.core.Vertx;
+import com.weareadaptive.gateway.ws.command.ErrorCommand;
+import com.weareadaptive.gateway.ws.command.ExecutionResultCommand;
+import com.weareadaptive.gateway.ws.command.OrderCommand;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.json.JsonObject;
@@ -19,36 +18,42 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.concurrent.TimeUnit;
 
+import static io.vertx.core.Vertx.vertx;
 import static org.junit.jupiter.api.Assertions.*;
 
+// todo: additional test cases
+// todo: stop using this hacky version of testing for vertx?
 @ExtendWith(VertxExtension.class)
 public class WebsocketTest
 {
-
-    private Vertx vertx;
     private HttpClient vertxClient;
+
     private Deployment deployment;
 
     @BeforeEach
     void setUp(final VertxTestContext testContext) throws InterruptedException
     {
         deployment = new Deployment();
-        deployment.startGateway();
-        vertxClient = vertx.createHttpClient();
+        deployment.startCluster();
+        deployment.startGateway(testContext.succeeding(id -> testContext.completeNow()));
+        vertxClient = vertx().createHttpClient();
     }
 
     @AfterEach
-    void tearDown()
+    void tearDown() throws InterruptedException
     {
         vertxClient.close();
         deployment.shutdownCluster();
+        deployment.shutdownGateway();
     }
 
     @Test
     @DisplayName("Establish connection from WS Client to WS Server")
     public void connectToServer(final VertxTestContext testContext) throws Throwable
     {
-        vertxClient.webSocket(8080, "localhost", "", client -> testContext.completeNow());
+        vertxClient.webSocket(8080, "localhost", "/", client -> {
+            testContext.completeNow();
+        });
         assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
         if (testContext.failed()) throw testContext.causeOfFailure();
     }
@@ -64,19 +69,20 @@ public class WebsocketTest
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             JsonObject orderRequest = new JsonObject();
             orderRequest.put("method", "place");
-            OrderDTO order = new OrderDTO(10, 15, Side.ASK);
+            OrderCommand order = new OrderCommand(10, 15, Side.ASK);
             orderRequest.put("order", JsonObject.mapFrom(order));
             Buffer request = Buffer.buffer(orderRequest.encode());
             websocket.write(request);
 
             websocket.handler(data -> {
-                final var newExecution = data.toJsonObject().mapTo(ExecutionResultDTO.class);
+                final var newExecution = data.toJsonObject().mapTo(ExecutionResultCommand.class);
+
                 assertSame(Status.RESTING, newExecution.status());
                 assertTrue(newExecution.orderId() >= 0);
                 testContext.completeNow();
             });
         });
-        assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
+        assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
     }
 
     @Test
@@ -93,7 +99,7 @@ public class WebsocketTest
             websocket.write(fakeRequest.toBuffer());
 
             websocket.handler(data -> {
-                final var errorDTO = data.toJsonObject().mapTo(ErrorDTO.class);
+                final var errorDTO = data.toJsonObject().mapTo(ErrorCommand.class);
                 assertEquals( 400, errorDTO.code());
                 testContext.completeNow();
             });
@@ -116,7 +122,7 @@ public class WebsocketTest
             websocket.write(request);
 
             websocket.handler(data -> {
-                final var error = data.toJsonObject().mapTo(ErrorDTO.class);
+                final var error = data.toJsonObject().mapTo(ErrorCommand.class);
                 assertEquals(400, error.code());
                 testContext.completeNow();
             });
@@ -140,7 +146,7 @@ public class WebsocketTest
             websocket.write(request);
 
             websocket.handler(data -> {
-                final var errorDTO = data.toJsonObject().mapTo(ErrorDTO.class);
+                final var errorDTO = data.toJsonObject().mapTo(ErrorCommand.class);
                 assertEquals( 400, errorDTO.code());
                 testContext.completeNow();
             });
@@ -159,26 +165,32 @@ public class WebsocketTest
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             JsonObject orderRequest = new JsonObject();
             orderRequest.put("method", "place");
-            OrderDTO order = new OrderDTO(10, 15, Side.ASK);
+            OrderCommand order = new OrderCommand(10, 15, Side.ASK);
             orderRequest.put("order", JsonObject.mapFrom(order));
             Buffer request = Buffer.buffer(orderRequest.encode());
             websocket.write(request);
 
-            JsonObject cancelRequest = new JsonObject();
-            cancelRequest.put("method", "cancel");
-            cancelRequest.put("orderId", 0);
-            Buffer cancel = Buffer.buffer(cancelRequest.encode());
-            websocket.write(cancel);
+            websocket.handler(placeOrderResponse -> {
+                long orderId = placeOrderResponse.toJsonObject().getLong("orderId");
 
-            websocket.handler(data -> {
-                final var newExecution = data.toJsonObject().mapTo(ExecutionResultDTO.class);
-                if (newExecution.status() == Status.CANCELLED) {
-                    assertSame(0L, newExecution.orderId());
-                    testContext.completeNow();
-                }
+                assertEquals(0, orderId);
+                JsonObject cancelRequest = new JsonObject();
+                cancelRequest.put("method", "cancel");
+                cancelRequest.put("orderId", orderId); // Use the orderId received from the place order response
+                Buffer cancel = Buffer.buffer(cancelRequest.encode());
+                websocket.write(cancel);
+
+                websocket.handler(cancelOrderResponse -> {
+                    final var executionResult = cancelOrderResponse.toJsonObject().mapTo(ExecutionResultCommand.class);
+                    if (executionResult.status() == Status.CANCELLED && executionResult.orderId() == orderId) {
+                        // Step 5: Test success - Order has been canceled successfully
+                        testContext.completeNow();
+                    }
+                });
             });
+
         });
-        assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
+        assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
     }
 
     @Test
@@ -194,7 +206,6 @@ public class WebsocketTest
             orderRequest.put("method", "clear");
             Buffer request = Buffer.buffer(orderRequest.encode());
             websocket.write(request);
-            testContext.completeNow();
 
             websocket.handler(data -> {
                 assertEquals("SUCCESS", data.toJsonObject().getString("status"));
@@ -217,7 +228,6 @@ public class WebsocketTest
             orderRequest.put("method", "clear");
             Buffer request = Buffer.buffer(orderRequest.encode());
             websocket.write(request);
-            testContext.completeNow();
 
             websocket.handler(data -> {
                 assertEquals("SUCCESS", data.toJsonObject().getString("status"));

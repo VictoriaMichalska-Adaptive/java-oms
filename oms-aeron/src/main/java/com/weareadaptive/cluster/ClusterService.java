@@ -1,6 +1,7 @@
 package com.weareadaptive.cluster;
 
 import com.weareadaptive.cluster.services.OMSService;
+import com.weareadaptive.cluster.services.util.ServiceName;
 import io.aeron.ExclusivePublication;
 import io.aeron.Image;
 import io.aeron.cluster.codecs.CloseReason;
@@ -9,13 +10,12 @@ import io.aeron.cluster.service.Cluster;
 import io.aeron.cluster.service.ClusteredService;
 import io.aeron.logbuffer.Header;
 import org.agrona.DirectBuffer;
-import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
+
+import static com.weareadaptive.util.Decoder.decodeServiceName;
 
 public class ClusterService implements ClusteredService
 {
@@ -63,15 +63,14 @@ public class ClusterService implements ClusteredService
     {
         LOGGER.info("Client ID: " + session.id() + " Ingress");
 
-        //Receive and decode buffer to receive 0 Echo
-        LOGGER.info("Client ID: " + session.id() + " Msg: " + buffer.getInt(offset));
-
-        //Encode a 1 int Echo to respond back to client
-        final MutableDirectBuffer msgBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Integer.BYTES));
-        msgBuffer.putInt(0, 1);
-
-        //Offer to client
-        while (session.offer(msgBuffer, 0, Integer.BYTES) < 0) ;
+        if (length > 4)
+        {
+            final ServiceName service = decodeServiceName(buffer, offset);
+            if (service == ServiceName.OMS)
+            {
+                omsService.messageHandler(session, buffer, offset + Byte.BYTES);
+            }
+        }
     }
 
     /**

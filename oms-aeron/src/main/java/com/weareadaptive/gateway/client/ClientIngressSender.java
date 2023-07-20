@@ -10,16 +10,18 @@ import java.nio.ByteBuffer;
 
 public class ClientIngressSender
 {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientIngressSender.class);
     AeronCluster aeronCluster;
 
     public ClientIngressSender(final AeronCluster aeronCluster)
     {
         this.aeronCluster = aeronCluster;
-
         //Offer a simple 0 Echo to the cluster on client start
         OfferEcho();
+    }
+
+    public void sendMessageToCluster(MutableDirectBuffer buffer, int length) {
+        while (aeronCluster.offer(buffer, 0, length) < 0);
     }
 
     private void OfferEcho()

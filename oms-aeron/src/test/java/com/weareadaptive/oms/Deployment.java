@@ -2,6 +2,9 @@ package com.weareadaptive.oms;
 
 import com.weareadaptive.cluster.ClusterNode;
 import com.weareadaptive.gateway.Gateway;
+import io.aeron.test.TestContexts;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
 
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
@@ -12,11 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class Deployment {
 
-    private HashMap<Integer, ClusterNode> nodes = new HashMap<>();
-    private HashMap<Integer, Thread> nodeThreads = new HashMap<>();
+    private final HashMap<Integer, ClusterNode> nodes = new HashMap<>();
+    private final HashMap<Integer, Thread> nodeThreads = new HashMap<>();
     private Gateway gateway;
     private Thread gatewayThread;
-
     public Gateway getGateway() {
         return gateway;
     }
@@ -151,6 +153,17 @@ public class Deployment {
 
     void startGateway() throws InterruptedException {
         gateway = new Gateway();
+
+        gatewayThread = new Thread(() ->
+                gateway.startGateway(3)
+        );
+
+        gatewayThread.start();
+        gatewayThread.join(2500);
+    }
+
+    void startGateway(Handler<AsyncResult<String>> testContext) throws InterruptedException {
+        gateway = new Gateway(testContext);
 
         gatewayThread = new Thread(() ->
                 gateway.startGateway(3)
