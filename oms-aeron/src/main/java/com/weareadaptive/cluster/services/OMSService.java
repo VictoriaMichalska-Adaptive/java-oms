@@ -85,7 +85,7 @@ public class OMSService
          */
         LOGGER.info("Clearing orderbook...");
         orderbook.clear();
-        Long messageId = decodeLongId(buffer, offset);
+        long messageId = decodeLongId(buffer, offset);
 
         while (session.offer(encodeSuccessMessage(messageId), 0, SUCCESS_MESSAGE_SIZE) < 0);
     }
@@ -100,7 +100,7 @@ public class OMSService
          *      - Offer Egress back to cluster client
          */
         orderbook.reset();
-        Long messageId = decodeLongId(buffer, offset);
+        long messageId = decodeLongId(buffer, offset);
 
         while (session.offer(encodeSuccessMessage(messageId), 0, SUCCESS_MESSAGE_SIZE) < 0);
     }

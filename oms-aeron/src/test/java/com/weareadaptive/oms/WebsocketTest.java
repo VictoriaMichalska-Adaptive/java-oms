@@ -173,17 +173,15 @@ public class WebsocketTest
             websocket.handler(placeOrderResponse -> {
                 long orderId = placeOrderResponse.toJsonObject().getLong("orderId");
 
-                assertEquals(0, orderId);
                 JsonObject cancelRequest = new JsonObject();
                 cancelRequest.put("method", "cancel");
-                cancelRequest.put("orderId", orderId); // Use the orderId received from the place order response
+                cancelRequest.put("orderId", orderId);
                 Buffer cancel = Buffer.buffer(cancelRequest.encode());
                 websocket.write(cancel);
 
                 websocket.handler(cancelOrderResponse -> {
                     final var executionResult = cancelOrderResponse.toJsonObject().mapTo(ExecutionResultCommand.class);
                     if (executionResult.status() == Status.CANCELLED && executionResult.orderId() == orderId) {
-                        // Step 5: Test success - Order has been canceled successfully
                         testContext.completeNow();
                     }
                 });

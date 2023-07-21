@@ -77,7 +77,6 @@ public class DecoderTest
     @Test
     public void encodeAndDecodeId() {
         MutableDirectBuffer buffer = encodeId(132);
-        printBufferContents(buffer);
         final var id = decodeLongId(buffer, 0);
         assertEquals(132, id);
     }

@@ -1,5 +1,5 @@
 package com.weareadaptive.gateway.ws.command;
 
-public record ErrorCommand(Integer code)
+public record ErrorCommand(int code)
 {
 }

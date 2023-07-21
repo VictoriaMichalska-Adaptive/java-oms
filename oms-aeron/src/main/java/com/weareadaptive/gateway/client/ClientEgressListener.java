@@ -92,7 +92,7 @@ public class ClientEgressListener implements EgressListener
         return this.currentLeader;
     }
 
-    public void addWebsocket(Long id, ServerWebSocket ws, Method method) {
+    public void addWebsocket(long id, ServerWebSocket ws, Method method) {
         allWebsockets.put(id, ws);
         allMethods.put(id, method);
     }

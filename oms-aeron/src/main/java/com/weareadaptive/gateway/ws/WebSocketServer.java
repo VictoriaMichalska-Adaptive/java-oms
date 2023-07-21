@@ -126,9 +126,8 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "CANCELLED"
      * }
      */
-    private void WSCancelOrder(final ServerWebSocket ws, Long messageId, Long orderId)
+    private void WSCancelOrder(final ServerWebSocket ws, long messageId, long orderId)
     {
-        if (orderId == null) throw new BadFieldException("orderId");
         System.out.println("messageId " + messageId);
         System.out.println("orderId " + orderId);
 
@@ -153,7 +152,7 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSClearOrderbook(final ServerWebSocket ws, final Long messageId)
+    private void WSClearOrderbook(final ServerWebSocket ws, final long messageId)
     {
         clientEgressListener.addWebsocket(messageId, ws, Method.CLEAR);
         MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE));
@@ -175,7 +174,7 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "SUCCESS"
      * }
      */
-    private void WSResetOrderbook(final ServerWebSocket ws, final Long messageId)
+    private void WSResetOrderbook(final ServerWebSocket ws, final long messageId)
     {
         clientEgressListener.addWebsocket(messageId, ws, Method.RESET);
 
