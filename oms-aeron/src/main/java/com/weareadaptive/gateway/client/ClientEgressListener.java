@@ -1,5 +1,7 @@
 package com.weareadaptive.gateway.client;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Status;
@@ -22,7 +24,7 @@ public class ClientEgressListener implements EgressListener
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientEgressListener.class);
     private int currentLeader = -1;
-    private final Map<Long, ServerWebSocket> allWebsockets = new HashMap<>();
+    private final BiMap<Long, ServerWebSocket> allWebsockets = HashBiMap.create();
     private final Map<Long, Method> allMethods = new HashMap<>();
 
     @Override

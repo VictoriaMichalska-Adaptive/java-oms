@@ -4,6 +4,7 @@ import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.oms.util.Status;
+import com.weareadaptive.cluster.services.util.CustomHeader;
 import com.weareadaptive.cluster.services.util.ServiceName;
 import com.weareadaptive.cluster.services.util.OrderRequestCommand;
 import org.agrona.MutableDirectBuffer;
@@ -37,6 +38,11 @@ public class DecoderTest
         ServiceName serviceName = decodeServiceName(encodedHeader, 0);
         Method method = decodeMethod(encodedHeader, SERVICE_NAME_SIZE);
         long messageId = decodeLongId(encodedHeader, SERVICE_NAME_SIZE + METHOD_NAME_SIZE);
+        CustomHeader customHeader = decodeOMSHeader(encodedHeader, 0);
+
+        assertEquals(ServiceName.OMS, customHeader.getServiceName());
+        assertEquals(Method.CANCEL, customHeader.getMethod());
+        assertEquals(12L, customHeader.getMessageId());
 
         assertEquals(ServiceName.OMS, serviceName);
         assertEquals(Method.CANCEL, method);
