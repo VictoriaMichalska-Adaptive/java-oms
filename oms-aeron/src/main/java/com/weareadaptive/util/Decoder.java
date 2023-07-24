@@ -1,10 +1,12 @@
 package com.weareadaptive.util;
 
+import com.weareadaptive.cluster.services.util.CustomHeader;
 import com.weareadaptive.cluster.services.util.ServiceName;
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.oms.util.Status;
+import com.weareadaptive.cluster.services.util.OrderRequestCommand;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -20,9 +22,14 @@ public class Decoder
     public final static int ID_SIZE = Long.BYTES;
     public final static int EXECUTION_RESULT_SIZE = Long.BYTES + Long.BYTES + Byte.BYTES;
     public final static int SUCCESS_MESSAGE_SIZE = Long.BYTES + Byte.BYTES;
-    public final static MutableDirectBuffer headerBuffer = new UnsafeBuffer(ByteBuffer.allocate(HEADER_SIZE));
-    public final static MutableDirectBuffer orderBuffer = new UnsafeBuffer(ByteBuffer.allocate(ORDER_SIZE));
-    public final static MutableDirectBuffer orderIdBuffer = new UnsafeBuffer(ByteBuffer.allocate(ID_SIZE));
+    private final static MutableDirectBuffer executionResultBuffer = new UnsafeBuffer(ByteBuffer.allocate(EXECUTION_RESULT_SIZE));
+    private final static MutableDirectBuffer successMessageBuffer = new UnsafeBuffer(ByteBuffer.allocate(SUCCESS_MESSAGE_SIZE));
+    private final static MutableDirectBuffer headerBuffer = new UnsafeBuffer(ByteBuffer.allocate(HEADER_SIZE));
+    private final static MutableDirectBuffer orderBuffer = new UnsafeBuffer(ByteBuffer.allocate(ORDER_SIZE));
+    private final static MutableDirectBuffer orderIdBuffer = new UnsafeBuffer(ByteBuffer.allocate(ID_SIZE));
+    private final static CustomHeader customHeader = new CustomHeader();
+    private static final OrderRequestCommand orderRequestCommand = new OrderRequestCommand();
+    private static final ExecutionResult executionResult = new ExecutionResult();
 
     public static MutableDirectBuffer encodeOMSHeader(final ServiceName serviceName,
                                          final Method method, final long messageId) {
@@ -54,7 +61,7 @@ public class Decoder
         return orderBuffer;
     }
 
-    public static OrderRequest decodeOrderRequest(final DirectBuffer buffer, final int offset) {
+    public static OrderRequestCommand decodeOrderRequest(final DirectBuffer buffer, final int offset) {
         int position = offset;
 
         double price = buffer.getDouble(position);
@@ -66,7 +73,7 @@ public class Decoder
         byte sideByte = buffer.getByte(position);
         Side side = Side.fromByteValue(sideByte);
 
-        return new OrderRequest(price, size, side);
+        return orderRequestCommand.setProperties(price, size, side);
     }
 
     public static ExecutionResult decodeExecutionResult(final DirectBuffer buffer, final int offset) {
@@ -75,7 +82,9 @@ public class Decoder
         position += Long.BYTES;
         final Status status = Status.fromByteValue(buffer.getByte(position));
 
-        return new ExecutionResult(orderId, status);
+        executionResult.setOrderId(orderId);
+        executionResult.setStatus(status);
+        return executionResult;
     }
 
     public static long decodeLongId(final DirectBuffer buffer, final int offset) {
@@ -90,15 +99,24 @@ public class Decoder
         return ServiceName.fromByteValue(buffer.getByte(offset));
     }
 
+    public static CustomHeader decodeOMSHeader(final DirectBuffer buffer, final int offset) {
+        int position = offset;
+        final ServiceName serviceName = ServiceName.fromByteValue(buffer.getByte(position));
+        position += Byte.BYTES;
+        final Method method = Method.fromByteValue(buffer.getByte(position));
+        position += Byte.BYTES;
+        final long id = buffer.getLong(position);
+
+        return customHeader.setProperties(serviceName, method, id);
+    }
+
     public static MutableDirectBuffer encodeSuccessMessage(Long messageId) {
-        MutableDirectBuffer responseBuffer = new UnsafeBuffer(ByteBuffer.allocate(SUCCESS_MESSAGE_SIZE));
-
         int currentPos = 0;
-        responseBuffer.putLong(currentPos, messageId);
+        successMessageBuffer.putLong(currentPos, messageId);
         currentPos += Long.BYTES;
-        responseBuffer.putByte(currentPos, Status.SUCCESS.getByte());
+        successMessageBuffer.putByte(currentPos, Status.SUCCESS.getByte());
 
-        return responseBuffer;
+        return successMessageBuffer;
     }
 
     public static Status decodeStatus(final DirectBuffer buffer, final int offset) {
@@ -106,15 +124,13 @@ public class Decoder
     }
 
     public static MutableDirectBuffer encodeExecutionResult(Long messageId, ExecutionResult executionResult) {
-        MutableDirectBuffer responseBuffer = new UnsafeBuffer(ByteBuffer.allocate(EXECUTION_RESULT_SIZE));
-
         int currentPos = 0;
-        responseBuffer.putLong(currentPos, messageId);
+        executionResultBuffer.putLong(currentPos, messageId);
         currentPos += Long.BYTES;
-        responseBuffer.putLong(currentPos, executionResult.getOrderId());
+        executionResultBuffer.putLong(currentPos, executionResult.getOrderId());
         currentPos += Long.BYTES;
-        responseBuffer.putByte(currentPos, executionResult.getStatus().getByte());
+        executionResultBuffer.putByte(currentPos, executionResult.getStatus().getByte());
 
-        return responseBuffer;
+        return executionResultBuffer;
     }
 }

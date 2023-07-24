@@ -1,7 +1,6 @@
 package com.weareadaptive.cluster;
 
 import com.weareadaptive.cluster.services.OMSService;
-import com.weareadaptive.cluster.services.util.ServiceName;
 import io.aeron.ExclusivePublication;
 import io.aeron.Image;
 import io.aeron.cluster.codecs.CloseReason;
@@ -15,7 +14,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
-import static com.weareadaptive.util.Decoder.decodeServiceName;
+import static com.weareadaptive.util.Decoder.HEADER_SIZE;
+import static com.weareadaptive.util.Decoder.decodeOMSHeader;
 
 public class ClusterService implements ClusteredService
 {
@@ -63,13 +63,11 @@ public class ClusterService implements ClusteredService
     {
         LOGGER.info("Client ID: " + session.id() + " Ingress");
 
-        if (length > 4)
+        final var customHeader = decodeOMSHeader(buffer, offset);
+        switch (customHeader.getServiceName())
         {
-            final ServiceName service = decodeServiceName(buffer, offset);
-            if (service == ServiceName.OMS)
-            {
-                omsService.messageHandler(session, buffer, offset + Byte.BYTES);
-            }
+            case OMS -> omsService.messageHandler(session, customHeader, buffer, offset + HEADER_SIZE);
+            case NONE -> LOGGER.error("Bad service name");
         }
     }
 

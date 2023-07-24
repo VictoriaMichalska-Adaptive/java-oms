@@ -9,10 +9,20 @@ public class ExecutionResult {
         this.status = status;
     }
 
+    public ExecutionResult() {
+    }
+
+    public void setOrderId(long orderId)
+    {
+        this.orderId = orderId;
+    }
+    public void setStatus(Status status)
+    {
+        this.status = status;
+    }
     public long getOrderId() {
         return orderId;
     }
-
     public Status getStatus() {
         return status;
     }

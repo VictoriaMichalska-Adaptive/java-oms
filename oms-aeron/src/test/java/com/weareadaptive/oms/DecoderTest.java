@@ -5,7 +5,7 @@ import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.oms.util.Status;
 import com.weareadaptive.cluster.services.util.ServiceName;
-import com.weareadaptive.util.OrderRequest;
+import com.weareadaptive.cluster.services.util.OrderRequestCommand;
 import org.agrona.MutableDirectBuffer;
 import org.junit.jupiter.api.Test;
 
@@ -46,11 +46,11 @@ public class DecoderTest
     @Test
     public void encodeAndDecodeOrderRequest() {
         MutableDirectBuffer buffer = encodeOrderRequest(10.45, 20, Side.BID);
-        OrderRequest orderRequest = decodeOrderRequest(buffer, 0);
+        OrderRequestCommand orderRequestCommand = decodeOrderRequest(buffer, 0);
 
-        assertEquals(10.45, orderRequest.price());
-        assertEquals(20, orderRequest.size());
-        assertEquals(Side.BID, orderRequest.side());
+        assertEquals(10.45, orderRequestCommand.getPrice());
+        assertEquals(20, orderRequestCommand.getSize());
+        assertEquals(Side.BID, orderRequestCommand.getSide());
     }
 
     @Test

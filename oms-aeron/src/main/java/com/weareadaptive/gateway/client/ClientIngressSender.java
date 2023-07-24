@@ -16,8 +16,6 @@ public class ClientIngressSender
     public ClientIngressSender(final AeronCluster aeronCluster)
     {
         this.aeronCluster = aeronCluster;
-        //Offer a simple 0 Echo to the cluster on client start
-        OfferEcho();
     }
 
     public void sendMessageToCluster(MutableDirectBuffer buffer, int length) {

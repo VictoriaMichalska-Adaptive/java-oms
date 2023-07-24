@@ -5,7 +5,7 @@ import java.util.Map;
 
 public enum ServiceName
 {
-    OMS((byte) 2);
+    OMS((byte) 2), NONE((byte) -1);
     private final int value;
     private static final Map<Byte, ServiceName> BYTE_TO_ENUM = new HashMap<>();
 
@@ -22,7 +22,7 @@ public enum ServiceName
         return (byte) value;
     }
     public static ServiceName fromByteValue(byte byteValue) {
-        ServiceName serviceName = BYTE_TO_ENUM.get(byteValue);
+        ServiceName serviceName = BYTE_TO_ENUM.getOrDefault(byteValue, NONE);
         if (serviceName == null) {
             throw new IllegalArgumentException("Invalid byte value for Side: " + byteValue);
         }
