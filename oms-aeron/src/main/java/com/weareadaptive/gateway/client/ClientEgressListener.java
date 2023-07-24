@@ -1,7 +1,5 @@
 package com.weareadaptive.gateway.client;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Status;
@@ -15,8 +13,8 @@ import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.weareadaptive.util.Decoder.*;
 
@@ -24,8 +22,8 @@ public class ClientEgressListener implements EgressListener
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientEgressListener.class);
     private int currentLeader = -1;
-    private final BiMap<Long, ServerWebSocket> allWebsockets = HashBiMap.create();
-    private final Map<Long, Method> allMethods = new HashMap<>();
+    private final Map<Long, ServerWebSocket> allWebsockets = new ConcurrentHashMap<>();
+    private final Map<Long, Method> allMethods = new ConcurrentHashMap<>();
 
     @Override
     public void onMessage(final long clusterSessionId, final long timestamp, final DirectBuffer buffer,
