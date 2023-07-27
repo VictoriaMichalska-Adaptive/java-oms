@@ -1,21 +1,27 @@
 package com.weareadaptive.oms;
 
-import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
-import com.weareadaptive.cluster.services.oms.util.Method;
-import com.weareadaptive.cluster.services.oms.util.Side;
-import com.weareadaptive.cluster.services.oms.util.Status;
+import com.weareadaptive.cluster.services.oms.OrderbookImpl;
+import com.weareadaptive.cluster.services.oms.util.*;
 import com.weareadaptive.cluster.services.util.CustomHeader;
-import com.weareadaptive.cluster.services.util.ServiceName;
 import com.weareadaptive.cluster.services.util.OrderRequestCommand;
+import com.weareadaptive.cluster.services.util.ServiceName;
+import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.junit.jupiter.api.Test;
 
-import static com.weareadaptive.util.Decoder.*;
+import java.util.HashSet;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static com.weareadaptive.util.Codec.*;
+import static com.weareadaptive.util.OrderbookCodec.encodeOrderbookState;
+import static com.weareadaptive.util.OrderbookCodec.processOrderbookSnapshot;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class DecoderTest
+public class CodecTest
 {
-    public static void printBufferContents(MutableDirectBuffer buffer) {
+    public static void printBufferContents(DirectBuffer buffer) {
         byte[] bytes = new byte[buffer.capacity()];
         buffer.getBytes(0, bytes);
 
@@ -85,5 +91,32 @@ public class DecoderTest
         MutableDirectBuffer buffer = encodeId(132);
         final var id = decodeLongId(buffer, 0);
         assertEquals(132, id);
+    }
+
+    @Test
+    public void encodeAndDecodeOrderbookState() {
+        TreeSet<Order> asks = createOrders(1, 5);
+        TreeSet<Order> bids = createOrders(6, 10);
+        HashSet<Long> activeIds = Stream.concat(asks.stream(), bids.stream()).map(Order::getOrderId).collect(Collectors.toCollection(HashSet::new));
+
+        long currentOrderId = 10;
+        DirectBuffer buffer = encodeOrderbookState(asks, bids, currentOrderId);
+
+        OrderbookImpl orderbook = processOrderbookSnapshot(buffer, 0, buffer.capacity());
+
+        assertEquals(asks, orderbook.getAsks());
+        assertEquals(bids, orderbook.getBids());
+        assertEquals(activeIds, orderbook.getActiveIds());
+        assertEquals(currentOrderId, orderbook.getCurrentOrderId());
+    }
+
+    private TreeSet<Order> createOrders(int start, int end)
+    {
+        TreeSet<Order> treeSet = new TreeSet<>();
+        for (int val = start; val <= end; val++)
+        {
+            treeSet.add(new Order(val, val, val));
+        }
+        return treeSet;
     }
 }

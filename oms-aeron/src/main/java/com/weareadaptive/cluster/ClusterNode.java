@@ -22,6 +22,7 @@ public class ClusterNode
     ClusteredServiceContainer clusteredServiceContainer;
     ClusteredMediaDriver clusteredMediaDriver;
     ClusterService clusterService = new ClusterService();
+    File clusterDir;
     boolean active = false;
 
     ShutdownSignalBarrier barrier = new ShutdownSignalBarrier();
@@ -55,8 +56,9 @@ public class ClusterNode
         clusterConfig.consensusModuleContext().ingressChannel("aeron:udp");
 
         clusterConfig.archiveContext().archiveDir(new File(baseDir, "archive"));
-        clusterConfig.clusteredServiceContext().clusterDir(new File(baseDir, "cluster"));
-        clusterConfig.consensusModuleContext().clusterDir(new File(baseDir, "cluster"));
+        clusterDir = new File(baseDir, "cluster");
+        clusterConfig.clusteredServiceContext().clusterDir(clusterDir);
+        clusterConfig.consensusModuleContext().clusterDir(clusterDir);
         clusterConfig.consensusModuleContext().deleteDirOnStart(test);
         clusterConfig.mediaDriverContext().aeronDirectoryName(aeronDirName);
         clusterConfig.archiveContext().aeronDirectoryName(aeronDirName);
@@ -108,5 +110,9 @@ public class ClusterNode
     public int getLeaderId()
     {
         return clusterService.getCurrentLeader();
+    }
+
+    public File getClusterDir() {
+        return clusterDir;
     }
 }

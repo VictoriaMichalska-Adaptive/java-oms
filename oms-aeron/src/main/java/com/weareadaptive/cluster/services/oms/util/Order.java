@@ -2,9 +2,9 @@ package com.weareadaptive.cluster.services.oms.util;
 
 public class Order implements Comparable<Order>
 {
-    final long orderId;
-    final double price;
-    long size;
+    private final long orderId;
+    private final double price;
+    private long size;
 
     public Order(long orderId, double price, long size)
     {
@@ -12,6 +12,7 @@ public class Order implements Comparable<Order>
         this.price = price;
         this.size = size;
     }
+
     public double getPrice() { return price; }
     public long getSize() { return size; }
     public void setSize(long newSize) { size = newSize; }
@@ -25,5 +26,12 @@ public class Order implements Comparable<Order>
             return -1 * Double.compare(order.getOrderId(), orderId);
         }
         return comparePrices;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Order order)) return false;
+        return (orderId == order.getOrderId()) && (price == order.price) && (size == order.size);
     }
 }

@@ -14,7 +14,7 @@ import org.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
 
-import static com.weareadaptive.util.Decoder.*;
+import static com.weareadaptive.util.Codec.*;
 
 public class WebSocketServer extends AbstractVerticle
 {
@@ -103,12 +103,12 @@ public class WebSocketServer extends AbstractVerticle
 
         clientEgressListener.addWebsocket(messageId, ws, Method.PLACE);
 
-        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE + ORDER_SIZE));
+        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE + ORDER_REQUEST_SIZE));
         buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.PLACE, id), 0, HEADER_SIZE);
         buffer.putBytes(HEADER_SIZE, encodeOrderRequest(jsonEvent.getDouble("price"),
-                jsonEvent.getLong("size"), Side.valueOf(jsonEvent.getString("side"))), 0, ORDER_SIZE);
+                jsonEvent.getLong("size"), Side.valueOf(jsonEvent.getString("side"))), 0, ORDER_REQUEST_SIZE);
 
-        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE + ORDER_SIZE);
+        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE + ORDER_REQUEST_SIZE);
     }
 
     /**

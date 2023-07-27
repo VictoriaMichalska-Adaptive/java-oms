@@ -11,9 +11,9 @@ import java.util.TreeSet;
 
 public class OrderbookImpl implements IOrderbook {
     private long currentOrderId = 0;
-    private final HashSet<Long> activeIds = new HashSet<>();
-    private final TreeSet<Order> asks = new TreeSet<>();
-    private final TreeSet<Order> bids = new TreeSet<>();
+    private HashSet<Long> activeIds = new HashSet<>();
+    private TreeSet<Order> asks = new TreeSet<>();
+    private TreeSet<Order> bids = new TreeSet<>();
 
     /**
      * * Implement Place Order logic
@@ -152,5 +152,22 @@ public class OrderbookImpl implements IOrderbook {
     public TreeSet<Order> getBids()
     {
         return bids;
+    }
+
+    public void setAsks(TreeSet<Order> asks) {
+        this.asks = asks;
+    }
+
+    public void setBids(TreeSet<Order> bids) {
+        this.bids = bids;
+    }
+
+    public void setActiveIds(HashSet<Long> activeIds) {
+        this.activeIds = activeIds;
+    }
+
+    public void setCurrentOrderId(long currentOrderId)
+    {
+        this.currentOrderId = currentOrderId;
     }
 }

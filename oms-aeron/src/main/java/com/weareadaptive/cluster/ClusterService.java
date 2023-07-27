@@ -1,6 +1,8 @@
 package com.weareadaptive.cluster;
 
-import com.weareadaptive.cluster.services.OMSService;
+import com.weareadaptive.cluster.services.infra.ClusterClientResponder;
+import com.weareadaptive.cluster.services.infra.ClusterClientResponderImpl;
+import com.weareadaptive.cluster.services.oms.OMSService;
 import io.aeron.ExclusivePublication;
 import io.aeron.Image;
 import io.aeron.cluster.codecs.CloseReason;
@@ -14,13 +16,14 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
-import static com.weareadaptive.util.Decoder.HEADER_SIZE;
-import static com.weareadaptive.util.Decoder.decodeOMSHeader;
+import static com.weareadaptive.util.Codec.HEADER_SIZE;
+import static com.weareadaptive.util.Codec.decodeOMSHeader;
 
 public class ClusterService implements ClusteredService
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusteredService.class);
     private OMSService omsService;
+    private final ClusterClientResponder clusterClientResponder = new ClusterClientResponderImpl();
     private int currentLeader = -1;
 
     /**
@@ -32,7 +35,10 @@ public class ClusterService implements ClusteredService
     public void onStart(final Cluster cluster, final Image snapshotImage)
     {
         registerOMSService();
-        restoreSnapshot(snapshotImage);
+        if (snapshotImage != null)
+        {
+            restoreSnapshot(snapshotImage);
+        }
     }
 
     /**
@@ -79,6 +85,8 @@ public class ClusterService implements ClusteredService
     @Override
     public void onTakeSnapshot(final ExclusivePublication snapshotPublication)
     {
+        var omsSnapshot = omsService.onTakeSnapshot();
+        snapshotPublication.offer(omsSnapshot, 0, omsSnapshot.capacity());
     }
 
     /**
@@ -88,6 +96,7 @@ public class ClusterService implements ClusteredService
      */
     public void restoreSnapshot(final Image snapshotImage)
     {
+        omsService.onRestoreSnapshot(snapshotImage);
     }
 
     @Override
@@ -134,7 +143,7 @@ public class ClusterService implements ClusteredService
 
     private void registerOMSService()
     {
-        omsService = new OMSService();
+        omsService = new OMSService(clusterClientResponder);
     }
 
     public int getCurrentLeader()

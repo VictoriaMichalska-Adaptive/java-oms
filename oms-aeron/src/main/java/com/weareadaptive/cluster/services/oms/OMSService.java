@@ -1,25 +1,30 @@
-package com.weareadaptive.cluster.services;
+package com.weareadaptive.cluster.services.oms;
 
 import com.weareadaptive.cluster.ClusterNode;
-import com.weareadaptive.cluster.services.oms.OrderbookImpl;
+import com.weareadaptive.cluster.services.infra.ClusterClientResponder;
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.util.CustomHeader;
 import com.weareadaptive.cluster.services.util.OrderRequestCommand;
+import io.aeron.Image;
 import io.aeron.cluster.service.ClientSession;
 import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.weareadaptive.util.Decoder.*;
+import static com.weareadaptive.util.Codec.*;
+import static com.weareadaptive.util.OrderbookCodec.decodeOrderbookState;
+import static com.weareadaptive.util.OrderbookCodec.encodeOrderbookState;
 
-// todo: potentially abstract away the while-loops
 public class OMSService
 {
-    private final OrderbookImpl orderbook = new OrderbookImpl();
+    private OrderbookImpl orderbook = new OrderbookImpl();
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterNode.class);
+    private final ClusterClientResponder clusterClientResponder;
 
-    public OMSService()
+
+    public OMSService(ClusterClientResponder clusterClientResponder)
     {
+        this.clusterClientResponder = clusterClientResponder;
     }
 
     public void messageHandler(final ClientSession session, final CustomHeader customHeader, final DirectBuffer buffer, final int offset) {
@@ -45,7 +50,7 @@ public class OMSService
         LOGGER.info(String.format("%s order is being placed for %d at %f", order.getSide().toString(), order.getSize(), order.getPrice()));
         final ExecutionResult executionResult = orderbook.placeOrder(order.getPrice(), order.getSize(), order.getSide());
 
-        while (session.offer(encodeExecutionResult(messageId, executionResult), 0, EXECUTION_RESULT_SIZE) < 0);
+        clusterClientResponder.onExecutionResult(session, messageId, executionResult);
     }
 
 
@@ -95,10 +100,10 @@ public class OMSService
          */
         orderbook.reset();
 
-        while (session.offer(encodeSuccessMessage(messageId), 0, SUCCESS_MESSAGE_SIZE) < 0);
+        clusterClientResponder.onSuccessMessage(session, messageId);
     }
 
-    public void onTakeSnapshot()
+    public DirectBuffer onTakeSnapshot()
     {
         /*
          * * Encode current orderbook state and offer to SnapshotPublication
@@ -106,14 +111,16 @@ public class OMSService
          *      - Encode Orderbook state
          *      - Offer to SnapshotPublication
          */
+        return encodeOrderbookState(orderbook.getAsks(), orderbook.getBids(), orderbook.getCurrentOrderId());
     }
 
-    public void onRestoreSnapshot()
+    public void onRestoreSnapshot(Image snapshotImage)
     {
         /*
          * * Decode Snapshot Image and restore Orderbook state
          *      - Decode Snapshot Image encoding into appropriate data structures
          *      - Restore into Orderbook state
          */
+        orderbook = decodeOrderbookState(snapshotImage);
     }
 }

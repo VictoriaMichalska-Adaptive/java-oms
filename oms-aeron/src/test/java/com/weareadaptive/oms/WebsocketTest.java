@@ -21,8 +21,6 @@ import java.util.concurrent.TimeUnit;
 import static io.vertx.core.Vertx.vertx;
 import static org.junit.jupiter.api.Assertions.*;
 
-// todo: additional test cases
-// todo: stop using this hacky version of testing for vertx?
 @ExtendWith(VertxExtension.class)
 public class WebsocketTest
 {
@@ -43,17 +41,15 @@ public class WebsocketTest
     void tearDown() throws InterruptedException
     {
         vertxClient.close();
-        deployment.shutdownCluster();
         deployment.shutdownGateway();
+        deployment.shutdownCluster();
     }
 
     @Test
     @DisplayName("Establish connection from WS Client to WS Server")
     public void connectToServer(final VertxTestContext testContext) throws Throwable
     {
-        vertxClient.webSocket(8080, "localhost", "/", client -> {
-            testContext.completeNow();
-        });
+        vertxClient.webSocket(8080, "localhost", "/", client -> testContext.completeNow());
         assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
         if (testContext.failed()) throw testContext.causeOfFailure();
     }

@@ -1,11 +1,8 @@
 package com.weareadaptive.util;
 
+import com.weareadaptive.cluster.services.oms.util.*;
 import com.weareadaptive.cluster.services.util.CustomHeader;
 import com.weareadaptive.cluster.services.util.ServiceName;
-import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
-import com.weareadaptive.cluster.services.oms.util.Method;
-import com.weareadaptive.cluster.services.oms.util.Side;
-import com.weareadaptive.cluster.services.oms.util.Status;
 import com.weareadaptive.cluster.services.util.OrderRequestCommand;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
@@ -13,19 +10,21 @@ import org.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
 
-public class Decoder
+public class Codec
 {
     public final static int METHOD_NAME_SIZE = Byte.BYTES;
     public final static int SERVICE_NAME_SIZE = Byte.BYTES;
     public final static int HEADER_SIZE = Byte.BYTES + Byte.BYTES + Long.BYTES;
-    public final static int ORDER_SIZE = Double.BYTES + Long.BYTES + Byte.BYTES;
+    public final static int ORDER_REQUEST_SIZE = Double.BYTES + Long.BYTES + Byte.BYTES;
     public final static int ID_SIZE = Long.BYTES;
     public final static int EXECUTION_RESULT_SIZE = Long.BYTES + Long.BYTES + Byte.BYTES;
     public final static int SUCCESS_MESSAGE_SIZE = Long.BYTES + Byte.BYTES;
+    public final static int END_OF_SNAPSHOT_MARKER_SIZE = Byte.BYTES;
+    public final static DirectBuffer endOfSnapshotMarker = new UnsafeBuffer(ByteBuffer.allocateDirect(END_OF_SNAPSHOT_MARKER_SIZE).put((byte) -1));
     private final static MutableDirectBuffer executionResultBuffer = new UnsafeBuffer(ByteBuffer.allocate(EXECUTION_RESULT_SIZE));
     private final static MutableDirectBuffer successMessageBuffer = new UnsafeBuffer(ByteBuffer.allocate(SUCCESS_MESSAGE_SIZE));
     private final static MutableDirectBuffer headerBuffer = new UnsafeBuffer(ByteBuffer.allocate(HEADER_SIZE));
-    private final static MutableDirectBuffer orderBuffer = new UnsafeBuffer(ByteBuffer.allocate(ORDER_SIZE));
+    private final static MutableDirectBuffer orderBuffer = new UnsafeBuffer(ByteBuffer.allocate(ORDER_REQUEST_SIZE));
     private final static MutableDirectBuffer orderIdBuffer = new UnsafeBuffer(ByteBuffer.allocate(ID_SIZE));
     private final static CustomHeader customHeader = new CustomHeader();
     private static final OrderRequestCommand orderRequestCommand = new OrderRequestCommand();
