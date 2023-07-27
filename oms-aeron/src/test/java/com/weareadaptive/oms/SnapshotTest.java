@@ -1,13 +1,17 @@
 package com.weareadaptive.oms;
 
-import io.aeron.Aeron;
+import com.weareadaptive.cluster.services.oms.util.Side;
+import com.weareadaptive.gateway.ws.command.OrderCommand;
 import io.aeron.cluster.ClusterTool;
-import io.aeron.cluster.service.ClusteredService;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
+import io.vertx.core.json.JsonObject;
+import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +22,7 @@ import java.io.PrintStream;
 
 import static io.vertx.core.Vertx.vertx;
 
+@ExtendWith(VertxExtension.class)
 public class SnapshotTest
 {
     // todo: MAKE TESTS TO SEE IF SNAPSHOTTING WORKS
@@ -29,7 +34,7 @@ public class SnapshotTest
     void setUp(final VertxTestContext testContext) throws InterruptedException
     {
         deployment = new Deployment();
-        deployment.startCluster();
+        deployment.startSingleNodeCluster(true);
         deployment.startGateway(testContext.succeeding(id -> testContext.completeNow()));
         vertxClient = vertx().createHttpClient();
     }
@@ -43,11 +48,16 @@ public class SnapshotTest
     }
 
     @Test
-    public void clusterCanRecoverToStateFromSnapshot() throws InterruptedException
+    public void clusterCanRecoverToStateFromSnapshot(final VertxTestContext testContext) throws Throwable
     {
-        deployment.startSingleNodeCluster();
-
-        // todo: give the node a certain non default state
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderRequest = new JsonObject();
+            orderRequest.put("method", "place");
+            OrderCommand order = new OrderCommand(10, 15, Side.ASK);
+            orderRequest.put("order", JsonObject.mapFrom(order));
+            Buffer request = Buffer.buffer(orderRequest.encode());
+            websocket.write(request);
+        });
 
         try {
             File outputFile = new File("output.txt");
@@ -56,7 +66,9 @@ public class SnapshotTest
         } catch (FileNotFoundException e) {
             LOGGER.error(e.toString());
         }
+        deployment.shutdownGateway();
+        deployment.shutdownCluster();
 
-        deployment.startSingleNodeCluster();
+        deployment.startSingleNodeCluster(false);
     }
 }

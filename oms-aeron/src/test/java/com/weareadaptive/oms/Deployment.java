@@ -2,7 +2,6 @@ package com.weareadaptive.oms;
 
 import com.weareadaptive.cluster.ClusterNode;
 import com.weareadaptive.gateway.Gateway;
-import io.aeron.test.TestContexts;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 
@@ -35,14 +34,14 @@ public class Deployment {
         return nodeThreads;
     }
 
-    public void startSingleNodeCluster() throws InterruptedException {
-        startNode(0,1);
+    public void startSingleNodeCluster(boolean testing) throws InterruptedException {
+        startNode(0,1, testing);
     }
 
     public void startCluster() throws InterruptedException {
-        startNode(0,3);
-        startNode(1,3);
-        startNode(2,3);
+        startNode(0,3, true);
+        startNode(1,3, true);
+        startNode(2,3, true);
     }
 
     public void shutdownCluster() {
@@ -69,12 +68,12 @@ public class Deployment {
         });
     }
 
-    public void startNode(int nodeId, int maxNodes) throws InterruptedException {
+    public void startNode(int nodeId, int maxNodes, boolean testing) throws InterruptedException {
         ClusterNode node = new ClusterNode();
         nodes.put(nodeId,node);
 
         Thread nodeThread = new Thread(() ->
-                node.startNode(nodeId, maxNodes, true)
+                node.startNode(nodeId, maxNodes, testing)
         );
 
         nodeThreads.put(

@@ -25,14 +25,14 @@ public class ClusterTest
     @Test
     @DisplayName("A single node cluster has started")
     void singleNodeClusterStart() throws InterruptedException {
-        deployment.startSingleNodeCluster();
+        deployment.startSingleNodeCluster(true);
         deployment.getNodes().forEach((id, node) -> assertTrue(node.isActive()));
     }
 
     @Test
     @DisplayName("A single node cluster has started and gracefully shutdown")
     void singleNodeClusterStartThenStop() throws InterruptedException {
-        deployment.startSingleNodeCluster();
+        deployment.startSingleNodeCluster(true);
         deployment.getNodes().forEach((id, node) -> assertTrue(node.isActive()));
         deployment.shutdownCluster();
         deployment.getNodes().forEach((id, node) -> assertFalse(node.isActive()));
