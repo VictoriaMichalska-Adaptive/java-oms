@@ -14,9 +14,13 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.weareadaptive.util.Codec.*;
-import static com.weareadaptive.util.OrderbookCodec.encodeOrderbookState;
-import static com.weareadaptive.util.OrderbookCodec.processOrderbookSnapshot;
+import static com.weareadaptive.gateway.codec.Decoder.decodeExecutionResult;
+import static com.weareadaptive.gateway.codec.Decoder.decodeStatus;
+import static com.weareadaptive.gateway.codec.Encoder.*;
+import static com.weareadaptive.cluster.infra.Codec.*;
+import static com.weareadaptive.cluster.infra.SnapshotCodec.encodeOrderbookState;
+import static com.weareadaptive.cluster.infra.SnapshotCodec.processOrderbookSnapshot;
+import static com.weareadaptive.util.CodecConstants.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class CodecTest

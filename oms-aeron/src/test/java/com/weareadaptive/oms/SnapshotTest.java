@@ -25,7 +25,6 @@ import static io.vertx.core.Vertx.vertx;
 @ExtendWith(VertxExtension.class)
 public class SnapshotTest
 {
-    // todo: MAKE TESTS TO SEE IF SNAPSHOTTING WORKS
     private Deployment deployment;
     private HttpClient vertxClient;
     private static final Logger LOGGER = LoggerFactory.getLogger(SnapshotTest.class);
@@ -51,24 +50,36 @@ public class SnapshotTest
     public void clusterCanRecoverToStateFromSnapshot(final VertxTestContext testContext) throws Throwable
     {
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
-            JsonObject orderRequest = new JsonObject();
-            orderRequest.put("method", "place");
-            OrderCommand order = new OrderCommand(10, 15, Side.ASK);
-            orderRequest.put("order", JsonObject.mapFrom(order));
-            Buffer request = Buffer.buffer(orderRequest.encode());
-            websocket.write(request);
+            JsonObject orderAsk = new JsonObject();
+            orderAsk.put("method", "place");
+            OrderCommand askOrder = new OrderCommand(100,1, Side.ASK);
+            orderAsk.put("order", JsonObject.mapFrom(askOrder));
+            Buffer request1 = Buffer.buffer(orderAsk.encode());
+            websocket.write(request1);
+            websocket.write(request1);
+
+            JsonObject orderBid = new JsonObject();
+            orderBid.put("method", "place");
+            OrderCommand order = new OrderCommand(1, 100, Side.BID);
+            orderBid.put("order", JsonObject.mapFrom(order));
+            Buffer request2 = Buffer.buffer(orderBid.encode());
+            websocket.write(request2);
+            websocket.write(request2);
         });
 
+        // todo: make sure the snapshot that is written can then be read
         try {
-            File outputFile = new File("output.txt");
+            File outputFile = new File("snapshot.dat");
             PrintStream filePrintStream = new PrintStream(new FileOutputStream(outputFile));
             deployment.getNodes().forEach((id, node) -> ClusterTool.snapshot(node.getClusterDir(), filePrintStream));
         } catch (FileNotFoundException e) {
             LOGGER.error(e.toString());
         }
+
         deployment.shutdownGateway();
         deployment.shutdownCluster();
 
         deployment.startSingleNodeCluster(false);
+        // todo: check if state is the same
     }
 }

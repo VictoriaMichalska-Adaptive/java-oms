@@ -14,7 +14,8 @@ import org.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
 
-import static com.weareadaptive.util.Codec.*;
+import static com.weareadaptive.gateway.codec.Encoder.*;
+import static com.weareadaptive.util.CodecConstants.*;
 
 public class WebSocketServer extends AbstractVerticle
 {
@@ -62,8 +63,11 @@ public class WebSocketServer extends AbstractVerticle
                 {
                     case "place" -> WSPlaceOrder(ws, ++id, jsonEvent.getJsonObject("order"));
                     case "cancel" -> WSCancelOrder(ws, ++id, jsonEvent.getLong("orderId"));
-                    case "clear" -> WSClearOrderbook(ws, ++id);
-                    case "reset" -> WSResetOrderbook(ws, ++id);
+                    case "clear" -> WSHeaderMessage(ws, ++id, Method.CLEAR);
+                    case "reset" -> WSHeaderMessage(ws, ++id, Method.RESET);
+                    case "bids" -> WSHeaderMessage(ws, ++id, Method.BIDS);
+                    case "asks" -> WSHeaderMessage(ws, ++id, Method.ASKS);
+                    case "orderId" -> WSHeaderMessage(ws, ++id, Method.CURRENT_ORDER_ID);
                     default -> throw new BadFieldException("method");
                 }
             }
@@ -139,47 +143,11 @@ public class WebSocketServer extends AbstractVerticle
         clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE + ID_SIZE);
     }
 
-    /**
-     * * Handle request into Orderbook, return status response to client
-     * <p>
-     * - e.g: JSON payload request
-     * {
-     * "method": "clear"
-     * }
-     * <p>
-     * - e.g: JSON response
-     * {
-     * "status": "SUCCESS"
-     * }
-     */
-    private void WSClearOrderbook(final ServerWebSocket ws, final long messageId)
+    private void WSHeaderMessage(final ServerWebSocket ws, final long messageId, final Method method)
     {
-        clientEgressListener.addWebsocket(messageId, ws, Method.CLEAR);
+        clientEgressListener.addWebsocket(messageId, ws, method);
         MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE));
-        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.CLEAR, id), 0, HEADER_SIZE);
-
-        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE);
-    }
-
-    /**
-     * * Handle request into Orderbook, return status response to client
-     * <p>
-     * - e.g: JSON payload request
-     * {
-     * "method": "reset"
-     * }
-     * <p>
-     * - e.g: JSON response
-     * {
-     * "status": "SUCCESS"
-     * }
-     */
-    private void WSResetOrderbook(final ServerWebSocket ws, final long messageId)
-    {
-        clientEgressListener.addWebsocket(messageId, ws, Method.RESET);
-
-        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE));
-        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.RESET, id), 0, HEADER_SIZE);
+        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, method, id), 0, HEADER_SIZE);
 
         clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE);
     }

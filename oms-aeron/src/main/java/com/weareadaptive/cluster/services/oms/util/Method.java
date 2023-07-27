@@ -5,8 +5,8 @@ import java.util.Map;
 
 public enum Method
 {
-    PLACE((byte) 0), CANCEL((byte) 1), CLEAR((byte) 2), RESET((byte) 3);
-    private int value;
+    PLACE((byte) 0), CANCEL((byte) 1), CLEAR((byte) 2), RESET((byte) 3), ASKS((byte) 4), BIDS((byte) 5), CURRENT_ORDER_ID((byte) 6);
+    final private int value;
     private static final Map<Byte, Method> BYTE_TO_ENUM = new HashMap<>();
 
     static {

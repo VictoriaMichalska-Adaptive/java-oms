@@ -16,7 +16,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static com.weareadaptive.util.Codec.*;
+import static com.weareadaptive.gateway.codec.Decoder.*;
+import static com.weareadaptive.util.CodecConstants.ID_SIZE;
 
 public class ClientEgressListener implements EgressListener
 {
@@ -33,7 +34,6 @@ public class ClientEgressListener implements EgressListener
         LOGGER.info("Message has been received");
         long id = decodeLongId(buffer, offset);
         if (allWebsockets.containsKey(id)) {
-
             final var responseType = allMethods.get(id);
             JsonObject sendThisMessage = getJsonObjectFromMessage(responseType, buffer, offset);
 
@@ -52,8 +52,20 @@ public class ClientEgressListener implements EgressListener
                 {
                     case CLEAR, RESET -> getSuccessMessageAsJson(buffer, offset + ID_SIZE);
                     case PLACE, CANCEL -> getExecutionResultAsJson(buffer, offset + ID_SIZE);
+                    case CURRENT_ORDER_ID -> getOrderIdResponse(buffer, offset + ID_SIZE);
+                    case ASKS, BIDS -> getOrdersResponse(buffer, offset + ID_SIZE);
                     default -> throw new BadFieldException("method not supported");
                 };
+    }
+
+    private JsonObject getOrdersResponse(DirectBuffer buffer, int i)
+    {
+        return JsonObject.of();
+    }
+
+    private JsonObject getOrderIdResponse(DirectBuffer buffer, int i)
+    {
+        return JsonObject.of();
     }
 
     private JsonObject getExecutionResultAsJson(DirectBuffer buffer, int offset)

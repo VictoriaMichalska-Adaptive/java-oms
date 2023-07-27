@@ -1,4 +1,4 @@
-package com.weareadaptive.util;
+package com.weareadaptive.cluster.infra;
 
 import com.weareadaptive.cluster.services.oms.OrderbookImpl;
 import com.weareadaptive.cluster.services.oms.util.Order;
@@ -7,18 +7,20 @@ import io.aeron.logbuffer.FragmentHandler;
 import org.agrona.DirectBuffer;
 import org.agrona.ExpandableArrayBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.UnsafeBuffer;
 
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.weareadaptive.util.Codec.END_OF_SNAPSHOT_MARKER_SIZE;
-import static com.weareadaptive.util.Codec.endOfSnapshotMarker;
+import static com.weareadaptive.util.CodecConstants.END_OF_SNAPSHOT_MARKER_SIZE;
 
-public class OrderbookCodec
+public class SnapshotCodec
 {
+    public final static DirectBuffer endOfSnapshotMarker = new UnsafeBuffer(ByteBuffer.allocateDirect(END_OF_SNAPSHOT_MARKER_SIZE).put((byte) -1));
     public static OrderbookImpl orderbook = new OrderbookImpl();
     public static int ORDER_SIZE = Long.BYTES + Double.BYTES + Long.BYTES;
     private static MutableDirectBuffer buffer;

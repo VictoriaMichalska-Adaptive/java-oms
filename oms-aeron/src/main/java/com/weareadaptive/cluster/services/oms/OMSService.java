@@ -11,9 +11,10 @@ import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.weareadaptive.util.Codec.*;
-import static com.weareadaptive.util.OrderbookCodec.decodeOrderbookState;
-import static com.weareadaptive.util.OrderbookCodec.encodeOrderbookState;
+import static com.weareadaptive.cluster.infra.Codec.*;
+import static com.weareadaptive.cluster.infra.SnapshotCodec.decodeOrderbookState;
+import static com.weareadaptive.cluster.infra.SnapshotCodec.encodeOrderbookState;
+import static com.weareadaptive.util.CodecConstants.*;
 
 public class OMSService
 {

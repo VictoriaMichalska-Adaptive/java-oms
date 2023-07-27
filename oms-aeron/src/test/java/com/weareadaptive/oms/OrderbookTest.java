@@ -1,13 +1,16 @@
 package com.weareadaptive.oms;
 
 import com.weareadaptive.cluster.services.oms.OrderbookImpl;
+import com.weareadaptive.cluster.services.oms.util.Order;
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.oms.util.Status;
-import com.weareadaptive.cluster.services.oms.util.Order;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class OrderbookTest {
     private OrderbookImpl orderbook;
@@ -27,7 +30,7 @@ public class OrderbookTest {
         final var returnedBid = orderbook.placeOrder(10, 10, Side.BID); // non-crossing bid
 
         // assert
-        Assertions.assertTrue(returnedBid.getOrderId() > 0);
+        assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.RESTING, returnedBid.getStatus());
     }
 
@@ -65,9 +68,9 @@ public class OrderbookTest {
         final var returnedAsk = orderbook.placeOrder(10, 10, Side.ASK); // non-crossing ask
 
         // assert
-        Assertions.assertTrue(returnedAsk.getOrderId() > 0);
+        assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.RESTING, returnedAsk.getStatus());
-        Assertions.assertTrue(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
+        assertTrue(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -80,9 +83,9 @@ public class OrderbookTest {
         final var returnedBid = orderbook.placeOrder(10, 15, Side.BID); // crossing bid
 
         // assert
-        Assertions.assertTrue(returnedBid.getOrderId() > 0);
+        assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.PARTIAL, returnedBid.getStatus());
-        Assertions.assertTrue(orderbook.getActiveIds().contains(returnedBid.getOrderId()));
+        assertTrue(orderbook.getActiveIds().contains(returnedBid.getOrderId()));
     }
 
     @Test
@@ -95,9 +98,9 @@ public class OrderbookTest {
         final var returnedAsk = orderbook.placeOrder(10, 15, Side.ASK); // crossing ask
 
         // assert
-        Assertions.assertTrue(returnedAsk.getOrderId() > 0);
+        assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.PARTIAL, returnedAsk.getStatus());
-        Assertions.assertTrue(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
+        assertTrue(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -110,7 +113,7 @@ public class OrderbookTest {
         final var returnedBid = orderbook.placeOrder(15, 5, Side.BID); // crossing bid
 
         // assert
-        Assertions.assertTrue(returnedBid.getOrderId() > 0);
+        assertTrue(returnedBid.getOrderId() > 0);
         Assertions.assertEquals(Status.FILLED, returnedBid.getStatus());
         Assertions.assertFalse(orderbook.getActiveIds().contains(returnedBid.getOrderId()));
     }
@@ -175,7 +178,7 @@ public class OrderbookTest {
         final var returnedAsk = orderbook.placeOrder(9, 5, Side.ASK); // crossing ask
 
         // assert
-        Assertions.assertTrue(returnedAsk.getOrderId() > 0);
+        assertTrue(returnedAsk.getOrderId() > 0);
         Assertions.assertEquals(Status.FILLED, returnedAsk.getStatus());
         Assertions.assertFalse(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
     }
@@ -228,6 +231,46 @@ public class OrderbookTest {
     }
 
     @Test
+    @DisplayName("Using getBids() returns all of the bids")
+    public void getBidsReturnsAllBids() {
+        final int numberOfOrdersPlaced = 4;
+        for (int j = 0; j <= numberOfOrdersPlaced; j++)
+        {
+            orderbook.placeOrder(j, 100, Side.BID);
+        }
+        final var orderIterator = orderbook.getBids().iterator();
+        Order currentOrder;
+        for (int i = numberOfOrdersPlaced; i >= 0; i--) {
+            if (orderIterator.hasNext())
+            {
+                currentOrder = orderIterator.next();
+                assertEquals(currentOrder.getPrice(), i);
+                assertEquals(100, currentOrder.getSize());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Using getAsks() returns all of the asks")
+    public void getAsksReturnsAllAsks() {
+        final int numberOfOrdersPlaced = 4;
+        for (int j = 0; j <= numberOfOrdersPlaced; j++)
+        {
+            orderbook.placeOrder(j, 100, Side.ASK);
+        }
+        final var orderIterator = orderbook.getAsks().iterator();
+        Order currentOrder;
+        for (int i = numberOfOrdersPlaced; i >= 0; i--) {
+            if (orderIterator.hasNext())
+            {
+                currentOrder = orderIterator.next();
+                assertEquals(currentOrder.getPrice(), i);
+                assertEquals(100, currentOrder.getSize());
+            }
+        }
+    }
+
+    @Test
     @DisplayName("All orderbook orders are cleared and should be empty when checked, orderId should not be reset.")
     public void clearOrderbook() {
         orderbook.placeOrder(100, 1, Side.ASK);
@@ -245,7 +288,7 @@ public class OrderbookTest {
 
         Assertions.assertEquals(0, orderbook.getAsks().size());
         Assertions.assertEquals(0, orderbook.getBids().size());
-        Assertions.assertTrue(orderbook.getActiveIds().isEmpty());
+        assertTrue(orderbook.getActiveIds().isEmpty());
         Assertions.assertEquals(currentId, orderbook.getCurrentOrderId());
     }
 
@@ -267,7 +310,7 @@ public class OrderbookTest {
 
         Assertions.assertEquals(0, orderbook.getAsks().size());
         Assertions.assertEquals(0, orderbook.getBids().size());
-        Assertions.assertTrue(orderbook.getActiveIds().isEmpty());
+        assertTrue(orderbook.getActiveIds().isEmpty());
         Assertions.assertNotEquals(currentId, orderbook.getCurrentOrderId());
     }
 
