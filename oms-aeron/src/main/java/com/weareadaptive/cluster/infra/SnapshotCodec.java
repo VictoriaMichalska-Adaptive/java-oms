@@ -16,10 +16,9 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.weareadaptive.util.CodecConstants.END_OF_SNAPSHOT_MARKER_SIZE;
-
 public class SnapshotCodec
 {
+    public final static int END_OF_SNAPSHOT_MARKER_SIZE = Byte.BYTES;
     public final static DirectBuffer endOfSnapshotMarker = new UnsafeBuffer(ByteBuffer.allocateDirect(END_OF_SNAPSHOT_MARKER_SIZE).put((byte) -1));
     public static OrderbookImpl orderbook = new OrderbookImpl();
     public static int ORDER_SIZE = Long.BYTES + Double.BYTES + Long.BYTES;
