@@ -15,8 +15,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -26,7 +24,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.vertx.core.Vertx.vertx;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(VertxExtension.class)
 public class SnapshotTest
@@ -54,19 +53,35 @@ public class SnapshotTest
     @Test
     public void clusterCanRecoverToStateFromSnapshot(final VertxTestContext testContext) throws Throwable
     {
-        CountDownLatch shutdownLatch = new CountDownLatch(2);
+        CountDownLatch shutdownLatch = new CountDownLatch(3);
+        CountDownLatch idLatch = new CountDownLatch(2);
         AtomicReference<List<TestOrder>> asks = new AtomicReference<>(null);
         AtomicReference<List<TestOrder>> bids = new AtomicReference<>(null);
+        AtomicReference<Long> currentId = new AtomicReference<>(null);
 
         // set up non-default state
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             OrderCommand bidOrder = new OrderCommand(1, 100, Side.BID);
-            bids.set(makeTwoOrdersAndCheckThatTheyOccurred(bidOrder, shutdownLatch));
+            bids.set(makeTwoOrdersAndCheckThatTheyOccurred(bidOrder, shutdownLatch, idLatch));
+            idLatch.countDown();
         });
 
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             OrderCommand askOrder = new OrderCommand(100,1, Side.ASK);
-            asks.set(makeTwoOrdersAndCheckThatTheyOccurred(askOrder, shutdownLatch));
+            asks.set(makeTwoOrdersAndCheckThatTheyOccurred(askOrder, shutdownLatch, idLatch));
+        });
+
+        idLatch.await();
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderIdRequest = new JsonObject();
+            orderIdRequest.put("method", "orderId");
+            Buffer getCurrentId = Buffer.buffer(orderIdRequest.encode());
+            websocket.write(getCurrentId);
+
+            websocket.handler(response -> {
+                currentId.set(response.toJsonObject().getLong("orderId"));
+                shutdownLatch.countDown();
+            });
         });
 
         shutdownLatch.await();
@@ -80,13 +95,22 @@ public class SnapshotTest
         deployment.startSingleNodeCluster(false);
 
         // assert same state as original
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> {
+            JsonObject orderIdRequest = new JsonObject();
+            orderIdRequest.put("method", "orderId");
+            Buffer getCurrentId = Buffer.buffer(orderIdRequest.encode());
+            webSocket.write(getCurrentId);
+
+            webSocket.handler(response -> assertEquals(currentId.get(), response.toJsonObject().getLong("orderId")));
+        });
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.ASK, webSocket, asks.get(), null));
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.BID, webSocket, bids.get(), testContext));
 
         assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
     }
 
-    private List<TestOrder> makeTwoOrdersAndCheckThatTheyOccurred(OrderCommand orderCommand, CountDownLatch bootupLatch)
+    private List<TestOrder> makeTwoOrdersAndCheckThatTheyOccurred(OrderCommand orderCommand, CountDownLatch bootupLatch,
+                                                                  CountDownLatch idLatch)
     {
         List<TestOrder> expectedOrders = new ArrayList<>();
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
@@ -107,13 +131,14 @@ public class SnapshotTest
 
                     getOrders(orderCommand.side(), websocket, expectedOrders, null);
                     bootupLatch.countDown();
+                    idLatch.countDown();
                 });
             });
         });
         return expectedOrders;
     }
 
-    private List<TestOrder> getOrders(Side side, WebSocket websocket, List<TestOrder> expectedOrders, VertxTestContext testContext) {
+    private void getOrders(Side side, WebSocket websocket, List<TestOrder> expectedOrders, VertxTestContext testContext) {
         JsonObject asksRequest = new JsonObject();
         final String fieldSide = side == Side.BID ? "bids" : "asks";
         asksRequest.put("method", fieldSide);
@@ -136,6 +161,5 @@ public class SnapshotTest
                 testContext.completeNow();
             }
         });
-        return orders;
     }
 }
