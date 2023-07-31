@@ -17,31 +17,14 @@ import java.util.stream.Stream;
 import static com.weareadaptive.gateway.codec.Decoder.decodeExecutionResult;
 import static com.weareadaptive.gateway.codec.Decoder.decodeStatus;
 import static com.weareadaptive.gateway.codec.Encoder.*;
-import static com.weareadaptive.cluster.infra.Codec.*;
-import static com.weareadaptive.cluster.infra.SnapshotCodec.encodeOrderbookState;
-import static com.weareadaptive.cluster.infra.SnapshotCodec.processOrderbookSnapshot;
+import static com.weareadaptive.cluster.codec.Codec.*;
+import static com.weareadaptive.cluster.codec.SnapshotCodec.encodeOrderbookState;
+import static com.weareadaptive.cluster.codec.SnapshotCodec.processOrderbookSnapshot;
 import static com.weareadaptive.util.CodecConstants.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class CodecTest
 {
-    public static void printBufferContents(DirectBuffer buffer) {
-        byte[] bytes = new byte[buffer.capacity()];
-        buffer.getBytes(0, bytes);
-
-        System.out.println("Buffer Contents:");
-        for (int i = 0; i < buffer.capacity(); i++) {
-            System.out.print(bytes[i] + " ");
-        }
-        System.out.println();
-        System.out.println("Buffer Contents (in binary):");
-        for (int i = 0; i < buffer.capacity(); i++) {
-            String binaryString = String.format("%8s", Integer.toBinaryString(buffer.getByte(i) & 0xFF)).replace(' ', '0');
-            System.out.print(binaryString + " ");
-        }
-        System.out.println();
-    }
-
     @Test
     public void encodeAndDecodeOMSHeader() {
         MutableDirectBuffer encodedHeader = encodeOMSHeader(ServiceName.OMS, Method.CANCEL, 12L);
@@ -106,7 +89,7 @@ public class CodecTest
         long currentOrderId = 10;
         DirectBuffer buffer = encodeOrderbookState(asks, bids, currentOrderId);
 
-        OrderbookImpl orderbook = processOrderbookSnapshot(buffer, 0, buffer.capacity());
+        OrderbookImpl orderbook = processOrderbookSnapshot(buffer, 0);
 
         assertEquals(asks, orderbook.getAsks());
         assertEquals(bids, orderbook.getBids());

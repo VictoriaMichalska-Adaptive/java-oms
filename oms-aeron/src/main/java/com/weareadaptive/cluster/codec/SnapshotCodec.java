@@ -1,4 +1,4 @@
-package com.weareadaptive.cluster.infra;
+package com.weareadaptive.cluster.codec;
 
 import com.weareadaptive.cluster.services.oms.OrderbookImpl;
 import com.weareadaptive.cluster.services.oms.util.Order;
@@ -16,12 +16,14 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.weareadaptive.util.CodecConstants.ORDER_SIZE;
+
 public class SnapshotCodec
 {
+    // TODO: potentially turn this into a proper snapshot handler that potentially implements FragmentHandler??
     public final static int END_OF_SNAPSHOT_MARKER_SIZE = Byte.BYTES;
     public final static DirectBuffer endOfSnapshotMarker = new UnsafeBuffer(ByteBuffer.allocateDirect(END_OF_SNAPSHOT_MARKER_SIZE).put((byte) -1));
     public static OrderbookImpl orderbook = new OrderbookImpl();
-    public static int ORDER_SIZE = Long.BYTES + Double.BYTES + Long.BYTES;
     private static MutableDirectBuffer buffer;
 
     public static DirectBuffer encodeOrderbookState(TreeSet<Order> asks, TreeSet<Order> bids, long currentOrderId)
@@ -67,15 +69,15 @@ public class SnapshotCodec
     {
         int newPos = pos;
         buffer.putInt(newPos, orders.size());
-        pos += Integer.BYTES;
+        newPos += Integer.BYTES;
         for (Order order : orders)
         {
-            buffer.putLong(pos, order.getOrderId());
-            pos += Long.BYTES;
-            buffer.putDouble(pos, order.getPrice());
-            pos += Double.BYTES;
-            buffer.putLong(pos, order.getSize());
-            pos += Long.BYTES;
+            buffer.putLong(newPos, order.getOrderId());
+            newPos += Long.BYTES;
+            buffer.putDouble(newPos, order.getPrice());
+            newPos += Double.BYTES;
+            buffer.putLong(newPos, order.getSize());
+            newPos += Long.BYTES;
         }
     }
 
@@ -85,8 +87,9 @@ public class SnapshotCodec
             return orderbook;
         }
 
+        // todo: this is probably not working as intended
         FragmentHandler fragmentHandler = (buffer, offset, length, header) -> {
-            orderbook = processOrderbookSnapshot(buffer, offset, length);
+            orderbook = processOrderbookSnapshot(buffer, offset);
         };
 
         while (true) {
@@ -99,7 +102,7 @@ public class SnapshotCodec
         return orderbook;
     }
 
-    public static OrderbookImpl processOrderbookSnapshot(DirectBuffer buffer, int offset, int length)
+    public static OrderbookImpl processOrderbookSnapshot(DirectBuffer buffer, int offset)
     {
         int pos = offset;
 
@@ -124,14 +127,15 @@ public class SnapshotCodec
 
     private static TreeSet<Order> decodeOrders(int pos, DirectBuffer buffer)
     {
-            TreeSet<Order> orders = new TreeSet<>();
-            int currentPosition = pos;
-            int totalNumberOfOrders = buffer.getInt(currentPosition);
-            currentPosition += Integer.BYTES;
-            for (int i = 0; i < totalNumberOfOrders; i++) {
-                orders.add(decodeOrder(currentPosition, buffer));
-                currentPosition += ORDER_SIZE;
-            }
+        TreeSet<Order> orders = new TreeSet<>();
+        int currentPosition = pos;
+        int totalNumberOfOrders = buffer.getInt(currentPosition);
+        currentPosition += Integer.BYTES;
+        for (int i = 0; i < totalNumberOfOrders; i++)
+        {
+            orders.add(decodeOrder(currentPosition, buffer));
+            currentPosition += ORDER_SIZE;
+        }
         return orders;
     }
 

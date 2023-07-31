@@ -2,9 +2,12 @@ package com.weareadaptive.oms;
 
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.gateway.ws.command.OrderCommand;
+import com.weareadaptive.oms.util.TestOrder;
 import io.aeron.cluster.ClusterTool;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.WebSocket;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
@@ -15,19 +18,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.vertx.core.Vertx.vertx;
+import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(VertxExtension.class)
 public class SnapshotTest
 {
     private Deployment deployment;
     private HttpClient vertxClient;
-    private static final Logger LOGGER = LoggerFactory.getLogger(SnapshotTest.class);
 
     @BeforeEach
     void setUp(final VertxTestContext testContext) throws InterruptedException
@@ -49,37 +54,88 @@ public class SnapshotTest
     @Test
     public void clusterCanRecoverToStateFromSnapshot(final VertxTestContext testContext) throws Throwable
     {
-        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
-            JsonObject orderAsk = new JsonObject();
-            orderAsk.put("method", "place");
-            OrderCommand askOrder = new OrderCommand(100,1, Side.ASK);
-            orderAsk.put("order", JsonObject.mapFrom(askOrder));
-            Buffer request1 = Buffer.buffer(orderAsk.encode());
-            websocket.write(request1);
-            websocket.write(request1);
+        CountDownLatch shutdownLatch = new CountDownLatch(2);
+        AtomicReference<List<TestOrder>> asks = new AtomicReference<>(null);
+        AtomicReference<List<TestOrder>> bids = new AtomicReference<>(null);
 
-            JsonObject orderBid = new JsonObject();
-            orderBid.put("method", "place");
-            OrderCommand order = new OrderCommand(1, 100, Side.BID);
-            orderBid.put("order", JsonObject.mapFrom(order));
-            Buffer request2 = Buffer.buffer(orderBid.encode());
-            websocket.write(request2);
-            websocket.write(request2);
+        // set up non-default state
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            OrderCommand bidOrder = new OrderCommand(1, 100, Side.BID);
+            bids.set(makeTwoOrdersAndCheckThatTheyOccurred(bidOrder, shutdownLatch));
         });
 
-        // todo: make sure the snapshot that is written can then be read
-        try {
-            File outputFile = new File("snapshot.dat");
-            PrintStream filePrintStream = new PrintStream(new FileOutputStream(outputFile));
-            deployment.getNodes().forEach((id, node) -> ClusterTool.snapshot(node.getClusterDir(), filePrintStream));
-        } catch (FileNotFoundException e) {
-            LOGGER.error(e.toString());
-        }
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            OrderCommand askOrder = new OrderCommand(100,1, Side.ASK);
+            asks.set(makeTwoOrdersAndCheckThatTheyOccurred(askOrder, shutdownLatch));
+        });
 
-        deployment.shutdownGateway();
+        shutdownLatch.await();
+
+        // snapshot, shut down, and reboot
+        deployment.getNodes().forEach((id, node) -> ClusterTool.snapshot(node.getClusterDir(), System.out));
+
         deployment.shutdownCluster();
-
+        deployment.shutdownGateway();
+        deployment.startGateway();
         deployment.startSingleNodeCluster(false);
-        // todo: check if state is the same
+
+        // assert same state as original
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.ASK, webSocket, asks.get(), null));
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.BID, webSocket, bids.get(), testContext));
+
+        assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
+    }
+
+    private List<TestOrder> makeTwoOrdersAndCheckThatTheyOccurred(OrderCommand orderCommand, CountDownLatch bootupLatch)
+    {
+        List<TestOrder> expectedOrders = new ArrayList<>();
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderRequest = new JsonObject();
+            orderRequest.put("method", "place");
+            orderRequest.put("order", JsonObject.mapFrom(orderCommand));
+            Buffer request = Buffer.buffer(orderRequest.encode());
+            websocket.write(request);
+
+            websocket.handler(placeOrderResponse -> {
+                long orderId = placeOrderResponse.toJsonObject().getLong("orderId");
+                expectedOrders.add(new TestOrder(orderId, orderCommand.price(), orderCommand.size()));
+                websocket.write(request);
+
+                websocket.handler(secondPlaceOrderResponse -> {
+                    long secondOrderId = secondPlaceOrderResponse.toJsonObject().getLong("orderId");
+                    expectedOrders.add(new TestOrder(secondOrderId, orderCommand.price(), orderCommand.size()));
+
+                    getOrders(orderCommand.side(), websocket, expectedOrders, null);
+                    bootupLatch.countDown();
+                });
+            });
+        });
+        return expectedOrders;
+    }
+
+    private List<TestOrder> getOrders(Side side, WebSocket websocket, List<TestOrder> expectedOrders, VertxTestContext testContext) {
+        JsonObject asksRequest = new JsonObject();
+        final String fieldSide = side == Side.BID ? "bids" : "asks";
+        asksRequest.put("method", fieldSide);
+        Buffer encodedRequest = Buffer.buffer(asksRequest.encode());
+        websocket.write(encodedRequest);
+
+        List<TestOrder> orders = new LinkedList<>();
+        websocket.handler(response -> {
+            JsonArray jsonArray = response.toJsonObject().getJsonArray("orders");
+
+            for (Object obj : jsonArray) {
+                if (obj instanceof JsonObject jsonObject) {
+                    TestOrder thisOrder = jsonObject.mapTo(TestOrder.class);
+                    orders.add(thisOrder);
+                }
+            }
+            assertEquals(expectedOrders, orders);
+
+            if (testContext != null) {
+                testContext.completeNow();
+            }
+        });
+        return orders;
     }
 }

@@ -1,14 +1,16 @@
-package com.weareadaptive.cluster.infra;
+package com.weareadaptive.cluster.codec;
 
 import com.weareadaptive.cluster.services.oms.util.*;
 import com.weareadaptive.cluster.services.util.CustomHeader;
 import com.weareadaptive.cluster.services.util.ServiceName;
 import com.weareadaptive.cluster.services.util.OrderRequestCommand;
 import org.agrona.DirectBuffer;
+import org.agrona.ExpandableDirectByteBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
+import java.util.TreeSet;
 
 import static com.weareadaptive.util.CodecConstants.*;
 
@@ -16,6 +18,8 @@ public class Codec
 {
     private final static MutableDirectBuffer executionResultBuffer = new UnsafeBuffer(ByteBuffer.allocate(EXECUTION_RESULT_SIZE));
     private final static MutableDirectBuffer successMessageBuffer = new UnsafeBuffer(ByteBuffer.allocate(SUCCESS_MESSAGE_SIZE));
+    private final static MutableDirectBuffer orderIdResponseBuffer = new UnsafeBuffer(ByteBuffer.allocate(ORDER_ID_RESPONSE_SIZE));
+    private static MutableDirectBuffer ordersBuffer;
     private final static CustomHeader customHeader = new CustomHeader();
     private static final OrderRequestCommand orderRequestCommand = new OrderRequestCommand();
 
@@ -75,5 +79,32 @@ public class Codec
         executionResultBuffer.putByte(currentPos, executionResult.getStatus().getByte());
 
         return executionResultBuffer;
+    }
+
+    public static DirectBuffer encodeOrders(long correlationId, TreeSet<Order> orders) {
+        ordersBuffer = new ExpandableDirectByteBuffer(Long.BYTES + (orders.size() * ORDER_SIZE));
+        int pos = 0;
+        ordersBuffer.putLong(pos, correlationId);
+        pos += Long.BYTES;
+        // todo: avoid code duplication without losing separation of concerns
+        ordersBuffer.putInt(pos, orders.size());
+        pos += Integer.BYTES;
+        for (Order order : orders)
+        {
+            ordersBuffer.putLong(pos, order.getOrderId());
+            pos += Long.BYTES;
+            ordersBuffer.putDouble(pos, order.getPrice());
+            pos += Double.BYTES;
+            ordersBuffer.putLong(pos, order.getSize());
+            pos += Long.BYTES;
+        }
+        return ordersBuffer;
+    }
+
+    public static DirectBuffer encodeOrderIdResponse(long correlationId, long currentOrderId)
+    {
+        orderIdResponseBuffer.putLong(0, correlationId);
+        orderIdResponseBuffer.putLong(Long.BYTES, currentOrderId);
+        return orderIdResponseBuffer;
     }
 }

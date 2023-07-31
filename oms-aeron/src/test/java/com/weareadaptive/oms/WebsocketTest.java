@@ -5,8 +5,10 @@ import com.weareadaptive.cluster.services.oms.util.Status;
 import com.weareadaptive.gateway.ws.command.ErrorCommand;
 import com.weareadaptive.gateway.ws.command.ExecutionResultCommand;
 import com.weareadaptive.gateway.ws.command.OrderCommand;
+import com.weareadaptive.oms.util.TestOrder;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
@@ -16,6 +18,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static io.vertx.core.Vertx.vertx;
@@ -77,6 +82,133 @@ public class WebsocketTest
                 assertTrue(newExecution.orderId() >= 0);
                 testContext.completeNow();
             });
+        });
+        assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("GetCurrentId from client and receive response from server")
+    public void wsGetCurrentIdRequest(final VertxTestContext testContext) throws Throwable
+    {
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderRequest = new JsonObject();
+            orderRequest.put("method", "place");
+            OrderCommand order = new OrderCommand(10, 15, Side.ASK);
+            orderRequest.put("order", JsonObject.mapFrom(order));
+            Buffer request = Buffer.buffer(orderRequest.encode());
+            websocket.write(request);
+
+            websocket.handler(placeOrderResponse -> {
+                long orderId = placeOrderResponse.toJsonObject().getLong("orderId");
+
+                JsonObject orderIdRequest = new JsonObject();
+                orderIdRequest.put("method", "orderId");
+                Buffer getCurrentId = Buffer.buffer(orderIdRequest.encode());
+                websocket.write(getCurrentId);
+
+                websocket.handler(response -> {
+                    final var currentId = response.toJsonObject().getLong("orderId");
+                    assertEquals(orderId + 1, currentId);
+                    testContext.completeNow();
+                });
+            });
+
+        });
+        assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("GetAsks request from client and receive response from server")
+    public void wsGetAsksRequest(final VertxTestContext testContext) throws Throwable
+    {
+        List<TestOrder> expectedOrders = new ArrayList<>();
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderRequest = new JsonObject();
+            orderRequest.put("method", "place");
+            OrderCommand order = new OrderCommand(10, 15, Side.ASK);
+            orderRequest.put("order", JsonObject.mapFrom(order));
+            Buffer request = Buffer.buffer(orderRequest.encode());
+            websocket.write(request);
+            websocket.write(request);
+
+            websocket.handler(placeOrderResponse -> {
+                long orderId = placeOrderResponse.toJsonObject().getLong("orderId");
+                expectedOrders.add(new TestOrder(orderId, 10, 15));
+
+                websocket.handler(secondPlaceOrderResponse -> {
+                    long secondOrderId = secondPlaceOrderResponse.toJsonObject().getLong("orderId");
+                    expectedOrders.add(new TestOrder(secondOrderId, 10, 15));
+
+                    JsonObject asksRequest = new JsonObject();
+                    asksRequest.put("method", "asks");
+                    Buffer encodedRequest = Buffer.buffer(asksRequest.encode());
+                    websocket.write(encodedRequest);
+
+                    websocket.handler(response -> {
+                        JsonArray jsonArray = response.toJsonObject().getJsonArray("orders");
+
+                        List<TestOrder> orders = new LinkedList<>();
+                        for (Object obj : jsonArray) {
+                            if (obj instanceof JsonObject jsonObject) {
+                                TestOrder thisOrder = jsonObject.mapTo(TestOrder.class);
+                                orders.add(thisOrder);
+                            }
+                        }
+
+                        assertEquals(expectedOrders, orders);
+                        testContext.completeNow();
+                    });
+                });
+            });
+
+        });
+        assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    @DisplayName("GetBids request from client and receive response from server")
+    public void wsGetBidsRequest(final VertxTestContext testContext) throws Throwable
+    {
+        List<TestOrder> expectedOrders = new ArrayList<>();
+        vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
+            JsonObject orderRequest = new JsonObject();
+            orderRequest.put("method", "place");
+            OrderCommand order = new OrderCommand(10, 15, Side.BID);
+            orderRequest.put("order", JsonObject.mapFrom(order));
+            Buffer request = Buffer.buffer(orderRequest.encode());
+            websocket.write(request);
+            websocket.write(request);
+
+            websocket.handler(placeOrderResponse -> {
+                long orderId = placeOrderResponse.toJsonObject().getLong("orderId");
+                expectedOrders.add(new TestOrder(orderId, 10, 15));
+
+                websocket.handler(secondPlaceOrderResponse -> {
+                    long secondOrderId = secondPlaceOrderResponse.toJsonObject().getLong("orderId");
+                    expectedOrders.add(new TestOrder(secondOrderId, 10, 15));
+
+                    JsonObject asksRequest = new JsonObject();
+                    asksRequest.put("method", "bids");
+                    Buffer encodedRequest = Buffer.buffer(asksRequest.encode());
+                    websocket.write(encodedRequest);
+
+                    websocket.handler(response -> {
+                        JsonArray jsonArray = response.toJsonObject().getJsonArray("orders");
+
+                        List<TestOrder> orders = new LinkedList<>();
+                        for (Object obj : jsonArray) {
+                            if (obj instanceof JsonObject jsonObject) {
+                                TestOrder thisOrder = jsonObject.mapTo(TestOrder.class);
+                                orders.add(thisOrder);
+                            }
+                        }
+
+                        assertEquals(expectedOrders, orders);
+                        testContext.completeNow();
+                    });
+                });
+            });
+
         });
         assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
     }
@@ -177,9 +309,9 @@ public class WebsocketTest
 
                 websocket.handler(cancelOrderResponse -> {
                     final var executionResult = cancelOrderResponse.toJsonObject().mapTo(ExecutionResultCommand.class);
-                    if (executionResult.status() == Status.CANCELLED && executionResult.orderId() == orderId) {
-                        testContext.completeNow();
-                    }
+                    assertEquals(Status.CANCELLED, executionResult.status());
+                    assertEquals(orderId, executionResult.orderId());
+                    testContext.completeNow();
                 });
             });
 

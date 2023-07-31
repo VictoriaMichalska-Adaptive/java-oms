@@ -9,4 +9,6 @@ public class CodecConstants
     public final static int ID_SIZE = Long.BYTES;
     public final static int EXECUTION_RESULT_SIZE = Long.BYTES + Long.BYTES + Byte.BYTES;
     public final static int SUCCESS_MESSAGE_SIZE = Long.BYTES + Byte.BYTES;
+    public final static int ORDER_ID_RESPONSE_SIZE = Long.BYTES + Long.BYTES;
+    public static int ORDER_SIZE = Long.BYTES + Double.BYTES + Long.BYTES;
 }

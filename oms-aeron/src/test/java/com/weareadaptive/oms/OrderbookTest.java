@@ -304,14 +304,13 @@ public class OrderbookTest {
         orderbook.placeOrder(4, 100, Side.BID);
         Assertions.assertEquals(3, orderbook.getAsks().size());
         Assertions.assertEquals(4, orderbook.getBids().size());
-        final var currentId = orderbook.getCurrentOrderId();
 
         orderbook.reset();
 
         Assertions.assertEquals(0, orderbook.getAsks().size());
         Assertions.assertEquals(0, orderbook.getBids().size());
         assertTrue(orderbook.getActiveIds().isEmpty());
-        Assertions.assertNotEquals(currentId, orderbook.getCurrentOrderId());
+        Assertions.assertEquals(0, orderbook.getCurrentOrderId());
     }
 
     @Test

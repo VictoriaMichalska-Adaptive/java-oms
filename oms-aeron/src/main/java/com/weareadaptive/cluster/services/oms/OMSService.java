@@ -3,6 +3,7 @@ package com.weareadaptive.cluster.services.oms;
 import com.weareadaptive.cluster.ClusterNode;
 import com.weareadaptive.cluster.services.infra.ClusterClientResponder;
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
+import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.util.CustomHeader;
 import com.weareadaptive.cluster.services.util.OrderRequestCommand;
 import io.aeron.Image;
@@ -11,10 +12,10 @@ import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.weareadaptive.cluster.infra.Codec.*;
-import static com.weareadaptive.cluster.infra.SnapshotCodec.decodeOrderbookState;
-import static com.weareadaptive.cluster.infra.SnapshotCodec.encodeOrderbookState;
-import static com.weareadaptive.util.CodecConstants.*;
+import static com.weareadaptive.cluster.codec.Codec.*;
+import static com.weareadaptive.cluster.codec.SnapshotCodec.decodeOrderbookState;
+import static com.weareadaptive.cluster.codec.SnapshotCodec.encodeOrderbookState;
+import static com.weareadaptive.util.CodecConstants.ID_SIZE;
 
 public class OMSService
 {
@@ -29,11 +30,29 @@ public class OMSService
     }
 
     public void messageHandler(final ClientSession session, final CustomHeader customHeader, final DirectBuffer buffer, final int offset) {
-        switch(customHeader.getMethod()) {
+        final var method = customHeader.getMethod();
+        switch(method) {
             case CANCEL -> cancelOrder(session, customHeader.getMessageId(), buffer, offset);
             case PLACE -> placeOrder(session, customHeader.getMessageId(), buffer, offset);
             case RESET -> resetOrderbook(session, customHeader.getMessageId());
             case CLEAR -> clearOrderbook(session, customHeader.getMessageId());
+            case ASKS, BIDS -> getOrders(session, customHeader.getMessageId(), method);
+            case CURRENT_ORDER_ID -> getCurrentOrderId(session, customHeader.getMessageId());
+        }
+    }
+
+    private void getCurrentOrderId(ClientSession session, long messageId) {
+        final long currentOrderId = orderbook.getCurrentOrderId();
+        clusterClientResponder.onOrderId(session, messageId, currentOrderId);
+    }
+
+    private void getOrders(ClientSession session, long messageId, Method method)
+    {
+        LOGGER.info("List of %s orders is being requested".formatted(method.name()));
+        switch(method) {
+            case ASKS -> clusterClientResponder.onOrders(session, messageId, orderbook.getAsks());
+            case BIDS -> clusterClientResponder.onOrders(session, messageId, orderbook.getBids());
+            default -> LOGGER.error("This method is does not return a list of Orders");
         }
     }
 
@@ -46,7 +65,7 @@ public class OMSService
          *      - Encode a response
          *      - Offer Egress back to cluster client
          */
-        final OrderRequestCommand order = decodeOrderRequest(buffer, offset + Long.BYTES);
+        final OrderRequestCommand order = decodeOrderRequest(buffer, offset);
 
         LOGGER.info(String.format("%s order is being placed for %d at %f", order.getSide().toString(), order.getSize(), order.getPrice()));
         final ExecutionResult executionResult = orderbook.placeOrder(order.getPrice(), order.getSize(), order.getSide());
@@ -55,7 +74,7 @@ public class OMSService
     }
 
 
-    private void cancelOrder(final ClientSession session, final long messageId, final DirectBuffer buffer, final int offset)
+    private void cancelOrder(final ClientSession session, final long correlationId, final DirectBuffer buffer, final int offset)
     {
         /*
          * * Receive Ingress binary encoding and cancel order in Orderbook
@@ -72,10 +91,10 @@ public class OMSService
         LOGGER.info("Cancelling order " + orderId);
         final ExecutionResult executionResult = orderbook.cancelOrder(orderId);
 
-        while (session.offer(encodeExecutionResult(messageId, executionResult), 0, EXECUTION_RESULT_SIZE) < 0);
+        clusterClientResponder.onExecutionResult(session, correlationId, executionResult);
     }
 
-    private void clearOrderbook(final ClientSession session, final long messageId)
+    private void clearOrderbook(final ClientSession session, final long correlationId)
     {
         /*
          * * Receive Ingress binary encoding and clear Orderbook
@@ -87,10 +106,10 @@ public class OMSService
         LOGGER.info("Clearing orderbook...");
         orderbook.clear();
 
-        while (session.offer(encodeSuccessMessage(messageId), 0, SUCCESS_MESSAGE_SIZE) < 0);
+        clusterClientResponder.onSuccessMessage(session, correlationId);
     }
 
-    private void resetOrderbook(final ClientSession session, final long messageId)
+    private void resetOrderbook(final ClientSession session, final long correlationId)
     {
         /*
          * * Receive Ingress binary encoding and reset Orderbook
@@ -99,9 +118,10 @@ public class OMSService
          *      - Encode a response
          *      - Offer Egress back to cluster client
          */
+        LOGGER.info("Resetting orderbook...");
         orderbook.reset();
 
-        clusterClientResponder.onSuccessMessage(session, messageId);
+        clusterClientResponder.onSuccessMessage(session, correlationId);
     }
 
     public DirectBuffer onTakeSnapshot()

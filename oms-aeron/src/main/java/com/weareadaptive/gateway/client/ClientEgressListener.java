@@ -2,18 +2,21 @@ package com.weareadaptive.gateway.client;
 
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.oms.util.Method;
+import com.weareadaptive.cluster.services.oms.util.Order;
 import com.weareadaptive.cluster.services.oms.util.Status;
 import com.weareadaptive.gateway.exception.BadFieldException;
 import io.aeron.cluster.client.EgressListener;
 import io.aeron.cluster.codecs.EventCode;
 import io.aeron.logbuffer.Header;
 import io.vertx.core.http.ServerWebSocket;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.weareadaptive.gateway.codec.Decoder.*;
@@ -58,14 +61,23 @@ public class ClientEgressListener implements EgressListener
                 };
     }
 
-    private JsonObject getOrdersResponse(DirectBuffer buffer, int i)
+    private JsonObject getOrdersResponse(DirectBuffer buffer, int offset)
     {
-        return JsonObject.of();
+        TreeSet<Order> orders = decodeOrders(offset, buffer);
+        JsonArray jsonArray = new JsonArray();
+        for (Order order : orders) {
+            JsonObject orderJson = JsonObject.mapFrom(order);
+            jsonArray.add(orderJson);
+        }
+
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.put("orders", jsonArray);
+        return jsonObject;
     }
 
-    private JsonObject getOrderIdResponse(DirectBuffer buffer, int i)
+    private JsonObject getOrderIdResponse(DirectBuffer buffer, int offset)
     {
-        return JsonObject.of();
+        return JsonObject.of("orderId", decodeOrderIdResponse(offset, buffer));
     }
 
     private JsonObject getExecutionResultAsJson(DirectBuffer buffer, int offset)

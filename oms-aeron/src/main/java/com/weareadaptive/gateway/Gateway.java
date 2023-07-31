@@ -98,6 +98,7 @@ public class Gateway
              *      - Send ingress
              *      - Receive egress
              */
+            // todo: remove this thread and see what happens
             keepClusterAlive = new Thread(() ->
             {
                 while (true)

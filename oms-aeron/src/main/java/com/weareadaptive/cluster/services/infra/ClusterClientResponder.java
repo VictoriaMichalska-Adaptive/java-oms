@@ -17,14 +17,19 @@
 package com.weareadaptive.cluster.services.infra;
 
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
+import com.weareadaptive.cluster.services.oms.util.Order;
 import io.aeron.cluster.service.ClientSession;
 
+import java.util.TreeSet;
+
 /**
- * Interface for responding to auction requests, encapsulating the SBE encoding and Aeron interactions
+ * Interface for responding to orderbook requests, encapsulating the SBE encoding and Aeron interactions
  */
 public interface ClusterClientResponder
 {
     void onExecutionResult(ClientSession session, long correlationId, ExecutionResult executionResult);
     void onSuccessMessage(ClientSession session, long correlationId);
+    void onOrders(ClientSession session, long messageId, TreeSet<Order> orders);
 
+    void onOrderId(ClientSession session, long messageId, long currentOrderId);
 }

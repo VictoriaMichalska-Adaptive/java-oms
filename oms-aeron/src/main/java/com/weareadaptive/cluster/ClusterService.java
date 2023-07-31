@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
-import static com.weareadaptive.cluster.infra.Codec.decodeOMSHeader;
+import static com.weareadaptive.cluster.codec.Codec.decodeOMSHeader;
 import static com.weareadaptive.util.CodecConstants.HEADER_SIZE;
 
 public class ClusterService implements ClusteredService
