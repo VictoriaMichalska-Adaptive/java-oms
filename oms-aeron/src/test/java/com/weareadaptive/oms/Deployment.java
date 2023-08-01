@@ -6,6 +6,7 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 
 import java.util.HashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
@@ -38,10 +39,10 @@ public class Deployment {
         startNode(0,1, testing);
     }
 
-    public void startCluster() throws InterruptedException {
-        startNode(0,3, true);
-        startNode(1,3, true);
-        startNode(2,3, true);
+    public void startCluster(boolean testing) throws InterruptedException {
+        startNode(0,3, testing);
+        startNode(1,3, testing);
+        startNode(2,3, testing);
     }
 
     public void shutdownCluster() {
@@ -68,6 +69,30 @@ public class Deployment {
         });
     }
 
+    public void shutdownCluster(final CountDownLatch latch) {
+        nodes.forEach( (id, node) -> {
+            if (node != null && node.isActive()) {
+                // Signal the node to shutdown
+                node.getBarrier().signal();
+                // Wait for the node to shut down
+                waitToDie(node);
+            }
+        });
+
+        nodeThreads.forEach((id, thread) -> {
+            if (thread != null) {
+                // Interrupt the thread if it's still running
+                thread.interrupt();
+                // Join the thread
+                try {
+                    thread.join();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+        latch.countDown();
+    }
     public void startNode(int nodeId, int maxNodes, boolean testing) throws InterruptedException {
         ClusterNode node = new ClusterNode();
         nodes.put(nodeId,node);
@@ -176,5 +201,12 @@ public class Deployment {
         gateway.shutdown();
         gatewayThread.interrupt();
         gatewayThread.join();
+    }
+
+    void shutdownGateway(CountDownLatch latch) throws InterruptedException {
+        gateway.shutdown();
+        gatewayThread.interrupt();
+        gatewayThread.join();
+        latch.countDown();
     }
 }

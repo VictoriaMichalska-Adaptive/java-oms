@@ -26,7 +26,7 @@ public class GatewayTest
     @Test
     @DisplayName("A gateway is launched and connects to the cluster")
     void gatewayConnects() throws InterruptedException {
-        deployment.startCluster();
+        deployment.startCluster(true);
         deployment.getNodes().forEach((id, node) -> assertTrue(node.isActive()));
         deployment.startGateway();
         assertEquals(deployment.getGateway().getLeaderId(),deployment.getLeaderId());

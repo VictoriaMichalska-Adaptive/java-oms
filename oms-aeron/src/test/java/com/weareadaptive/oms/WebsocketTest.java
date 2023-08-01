@@ -37,7 +37,7 @@ public class WebsocketTest
     void setUp(final VertxTestContext testContext) throws InterruptedException
     {
         deployment = new Deployment();
-        deployment.startCluster();
+        deployment.startCluster(true);
         deployment.startGateway(testContext.succeeding(id -> testContext.completeNow()));
         vertxClient = vertx().createHttpClient();
     }

@@ -37,7 +37,7 @@ public class SnapshotTest
     void setUp(final VertxTestContext testContext) throws InterruptedException
     {
         deployment = new Deployment();
-        deployment.startSingleNodeCluster(true);
+        deployment.startCluster(true);
         deployment.startGateway(testContext.succeeding(id -> testContext.completeNow()));
         vertxClient = vertx().createHttpClient();
     }
@@ -87,18 +87,21 @@ public class SnapshotTest
         shutdownLatch.await();
 
         // snapshot, shut down, and reboot
-        deployment.getNodes().forEach((id, node) -> ClusterTool.snapshot(node.getClusterDir(), System.out));
+        ClusterTool.snapshot(deployment.getNodes().get(deployment.getLeaderId()).getClusterDir(), System.out);
 
-        deployment.shutdownCluster();
-        deployment.shutdownGateway();
+        CountDownLatch completeLatch = new CountDownLatch(2);
+        deployment.shutdownCluster(completeLatch);
+        deployment.shutdownGateway(completeLatch);
+
+        completeLatch.await();
         deployment.startGateway();
         deployment.startSingleNodeCluster(false);
 
         // assert same state as original
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> {
-            JsonObject orderIdRequest = new JsonObject();
+            final JsonObject orderIdRequest = new JsonObject();
             orderIdRequest.put("method", "orderId");
-            Buffer getCurrentId = Buffer.buffer(orderIdRequest.encode());
+            final Buffer getCurrentId = Buffer.buffer(orderIdRequest.encode());
             webSocket.write(getCurrentId);
 
             webSocket.handler(response -> assertEquals(currentId.get(), response.toJsonObject().getLong("orderId")));

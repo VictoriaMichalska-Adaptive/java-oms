@@ -74,6 +74,7 @@ public class Gateway
                     .ingressChannel("aeron:udp")
                     .ingressEndpoints(ingressEndpoints(maxNodes))
                     .messageTimeoutNs(TimeUnit.SECONDS.toNanos(5))
+                        //.isIngressExclusive(true)
                     .errorHandler(new ErrorHandler()
                     {
                         @Override

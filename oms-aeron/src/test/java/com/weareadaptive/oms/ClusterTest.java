@@ -41,14 +41,14 @@ public class ClusterTest
     @Test
     @DisplayName("A cluster of 3 nodes has started")
     void clusterStart() throws InterruptedException {
-        deployment.startCluster();
+        deployment.startCluster(true);
         deployment.getNodes().forEach((id, node) -> assertTrue(node.isActive()));
     }
 
     @Test
     @DisplayName("A cluster of 3 nodes has started and gracefully shutdown")
     void clusterStartThenStop() throws InterruptedException {
-        deployment.startCluster();
+        deployment.startCluster(true);
         deployment.getNodes().forEach((id, node) -> assertTrue(node.isActive()));
         deployment.shutdownCluster();
         deployment.getNodes().forEach((id, node) -> assertFalse(node.isActive()));
