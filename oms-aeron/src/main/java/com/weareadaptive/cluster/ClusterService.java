@@ -11,6 +11,7 @@ import io.aeron.cluster.service.Cluster;
 import io.aeron.cluster.service.ClusteredService;
 import io.aeron.logbuffer.Header;
 import org.agrona.DirectBuffer;
+import org.agrona.concurrent.IdleStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +35,7 @@ public class ClusterService implements ClusteredService
     @Override
     public void onStart(final Cluster cluster, final Image snapshotImage)
     {
-        registerOMSService();
+        registerOMSService(cluster.idleStrategy());
         if (snapshotImage != null)
         {
             restoreSnapshot(snapshotImage);
@@ -85,8 +86,7 @@ public class ClusterService implements ClusteredService
     @Override
     public void onTakeSnapshot(final ExclusivePublication snapshotPublication)
     {
-        var omsSnapshot = omsService.onTakeSnapshot();
-        snapshotPublication.offer(omsSnapshot, 0, omsSnapshot.capacity());
+        omsService.onTakeSnapshot(snapshotPublication);
     }
 
     /**
@@ -141,9 +141,9 @@ public class ClusterService implements ClusteredService
         LOGGER.info("Cluster node is terminating");
     }
 
-    private void registerOMSService()
+    private void registerOMSService(IdleStrategy idleStrategy)
     {
-        omsService = new OMSService(clusterClientResponder);
+        omsService = new OMSService(clusterClientResponder, idleStrategy);
     }
 
     public int getCurrentLeader()

@@ -1,31 +1,34 @@
 package com.weareadaptive.cluster.services.oms;
 
 import com.weareadaptive.cluster.ClusterNode;
+import com.weareadaptive.cluster.codec.SnapshotManager;
 import com.weareadaptive.cluster.services.infra.ClusterClientResponder;
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.util.CustomHeader;
 import com.weareadaptive.cluster.services.util.OrderRequestCommand;
+import io.aeron.ExclusivePublication;
 import io.aeron.Image;
 import io.aeron.cluster.service.ClientSession;
 import org.agrona.DirectBuffer;
+import org.agrona.concurrent.IdleStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.weareadaptive.cluster.codec.Codec.*;
-import static com.weareadaptive.cluster.codec.SnapshotCodec.decodeOrderbookState;
-import static com.weareadaptive.cluster.codec.SnapshotCodec.encodeOrderbookState;
 import static com.weareadaptive.util.CodecConstants.ID_SIZE;
 
 public class OMSService
 {
+    private final SnapshotManager snapshotManager = new SnapshotManager();
     private OrderbookImpl orderbook = new OrderbookImpl();
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterNode.class);
     private final ClusterClientResponder clusterClientResponder;
 
 
-    public OMSService(ClusterClientResponder clusterClientResponder)
+    public OMSService(ClusterClientResponder clusterClientResponder, IdleStrategy idleStrategy)
     {
+        snapshotManager.setIdleStrategy(idleStrategy);
         this.clusterClientResponder = clusterClientResponder;
     }
 
@@ -124,7 +127,7 @@ public class OMSService
         clusterClientResponder.onSuccessMessage(session, correlationId);
     }
 
-    public DirectBuffer onTakeSnapshot()
+    public void onTakeSnapshot(ExclusivePublication snapshotPublication)
     {
         /*
          * * Encode current orderbook state and offer to SnapshotPublication
@@ -132,7 +135,7 @@ public class OMSService
          *      - Encode Orderbook state
          *      - Offer to SnapshotPublication
          */
-        return encodeOrderbookState(orderbook.getAsks(), orderbook.getBids(), orderbook.getCurrentOrderId());
+        snapshotManager.encodeOrderbookState(snapshotPublication, orderbook.getAsks(), orderbook.getBids(), orderbook.getCurrentOrderId());
     }
 
     public void onRestoreSnapshot(Image snapshotImage)
@@ -142,6 +145,6 @@ public class OMSService
          *      - Decode Snapshot Image encoding into appropriate data structures
          *      - Restore into Orderbook state
          */
-        orderbook = decodeOrderbookState(snapshotImage);
+        orderbook = snapshotManager.loadSnapshot(snapshotImage);
     }
 }
