@@ -1,0 +1,32 @@
+plugins {
+    id 'java'
+}
+
+group 'com.weareadaptive'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'uk.co.real-logic:sbe-tool:1.29.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+}
+
+tasks.register('generateMessages', JavaExec) {
+    main = 'uk.co.real_logic.sbe.SbeTool'
+    classpath = sourceSets.main.runtimeClasspath
+    systemProperties('sbe.output.dir': file("${buildDir}/generated/src/main/java"),
+            'sbe.target.language': 'Java',
+            'sbe.validation.stop.on.error': 'true',
+            'sbe.validation.xsd': 'src/main/resources/sbe/sbe.xsd')
+    args = [
+            'src/main/resources/oms_messages.xml'
+    ]
+}
+
+test {
+    useJUnitPlatform()
+}

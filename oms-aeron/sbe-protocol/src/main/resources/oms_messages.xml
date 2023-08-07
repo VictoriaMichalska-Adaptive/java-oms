@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="com.weareadaptive.sbe"
+                   id="688"
+                   version="1"
+                   semanticVersion="0.1"
+                   description="Sample SBE Messages">
+    <types>
+        <type name="correlationId" primitiveType="uint64"/>
+        <type name="orderId" primitiveType="uint64"/>
+        <type name="price" primitiveType="double"/>
+        <type name="size" primitiveType="uint64"/>
+        <type name="status" primitiveType="uint8"/>
+        <type name="side" primitiveType="uint8"/>
+        <composite name="messageHeader" description="Service name, method name, and correlation ID">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="templateId" primitiveType="uint16"/>
+            <type name="schemaId" primitiveType="uint16"/>
+            <type name="version" primitiveType="uint16"/>
+
+            <type name="serviceName" primitiveType="uint8"/>
+            <type name="method" primitiveType="uint8"/>
+            <type name="correlationId" primitiveType="uint64"/>
+        </composite>
+        <composite name="groupSizeEncoding">
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="numInGroup" primitiveType="uint16"/>
+        </composite>
+    </types>
+
+    <sbe:message name="orderRequest" id="1">
+        <field name="price" id="1" type="price"/>
+        <field name="size" id="2" type="size"/>
+        <field name="side" id="3" type="side"/>
+    </sbe:message>
+    <sbe:message name="executionResult" id="2">
+        <field name="correlationId" id="0" type="correlationId"/>
+        <field name="orderId" id="1" type="orderId"/>
+        <field name="status" id="2" type="status"/>
+    </sbe:message>
+    <sbe:message name="successMessage" id="3">
+        <field name="correlationId" id="0" type="correlationId"/>
+        <field name="status" id="1" type="status"/>
+    </sbe:message>
+    <sbe:message name="orders" id="4">
+        <field name="correlationId" id="0" type="correlationId"/>
+        <group name="allOrders" id="1" blockLength="28">
+            <field name="encodedLength" id="0" type="groupSizeEncoding"/>
+            <field name="orderId" id="1" type="orderId"/>
+            <field name="price" id="2" type="price"/>
+            <field name="size" id="3" type="size"/>
+        </group>
+    </sbe:message>
+    <sbe:message name="orderId" id="5">
+        <field name="correlationId" id="0" type="correlationId"/>
+        <field name="orderId" id="1" type="orderId"/>
+    </sbe:message>
+</sbe:messageSchema>
