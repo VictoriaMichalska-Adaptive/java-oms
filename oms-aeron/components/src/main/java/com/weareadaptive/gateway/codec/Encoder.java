@@ -3,7 +3,6 @@ package com.weareadaptive.gateway.codec;
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.util.ServiceName;
-import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
