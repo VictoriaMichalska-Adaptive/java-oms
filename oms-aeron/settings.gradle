@@ -1,3 +1,4 @@
 rootProject.name = 'aeron-oms'
 include 'sbe-protocol'
+include 'components'
 

@@ -1,8 +1,8 @@
 package com.weareadaptive.gateway.ws;
 
-import com.weareadaptive.cluster.services.util.ServiceName;
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Side;
+import com.weareadaptive.cluster.services.util.ServiceName;
 import com.weareadaptive.gateway.client.ClientEgressListener;
 import com.weareadaptive.gateway.client.ClientIngressSender;
 import com.weareadaptive.gateway.exception.BadFieldException;
@@ -22,6 +22,8 @@ public class WebSocketServer extends AbstractVerticle
     ClientIngressSender clientIngressSender;
     ClientEgressListener clientEgressListener;
     private long id = 0L;
+    // todo: actually use the header encoder
+    final com.weareadaptive.sbe.MessageHeaderEncoder headerEncoder = new com.weareadaptive.sbe.MessageHeaderEncoder();
 
     public WebSocketServer(final ClientIngressSender clientIngressSender,
                            final ClientEgressListener clientEgressListener)
