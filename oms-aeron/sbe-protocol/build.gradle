@@ -27,6 +27,12 @@ tasks.register('generateMessages', JavaExec) {
     ]
 }
 
+sourceSets {
+    main {
+        java.srcDir(file("${buildDir}/generated/src/main"))
+    }
+}
+
 test {
     useJUnitPlatform()
 }
