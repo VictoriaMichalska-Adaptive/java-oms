@@ -351,7 +351,7 @@ public class WebsocketTest
          */
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             JsonObject orderRequest = new JsonObject();
-            orderRequest.put("method", "clear");
+            orderRequest.put("method", "reset");
             Buffer request = Buffer.buffer(orderRequest.encode());
             websocket.write(request);
 

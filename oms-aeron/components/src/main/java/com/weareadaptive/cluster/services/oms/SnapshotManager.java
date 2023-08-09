@@ -1,6 +1,5 @@
-package com.weareadaptive.cluster.codec;
+package com.weareadaptive.cluster.services.oms;
 
-import com.weareadaptive.cluster.services.oms.OrderbookImpl;
 import com.weareadaptive.cluster.services.oms.util.Order;
 import com.weareadaptive.cluster.services.oms.util.Side;
 import com.weareadaptive.cluster.services.util.SnapshotHeader;
@@ -20,14 +19,13 @@ import java.util.Objects;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import static com.weareadaptive.util.CodecConstants.ORDER_SIZE;
-
 public class SnapshotManager implements FragmentHandler
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(SnapshotManager.class);
     private boolean snapshotFullyLoaded = false;
     private IdleStrategy idleStrategy;
     public OrderbookImpl orderbook = new OrderbookImpl();
+    public static int ORDER_SIZE = Long.BYTES + Double.BYTES + Long.BYTES;
     private final MutableDirectBuffer currentIdBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Byte.BYTES + Long.BYTES));
     private final MutableDirectBuffer endOfSnapshotBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Byte.BYTES));
 

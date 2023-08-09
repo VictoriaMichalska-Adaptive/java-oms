@@ -3,6 +3,7 @@ package com.weareadaptive.cluster;
 import com.weareadaptive.cluster.services.infra.ClusterClientResponder;
 import com.weareadaptive.cluster.services.infra.ClusterClientResponderImpl;
 import com.weareadaptive.cluster.services.oms.OMSService;
+import com.weareadaptive.sbe.MessageHeaderDecoder;
 import io.aeron.ExclusivePublication;
 import io.aeron.Image;
 import io.aeron.cluster.codecs.CloseReason;
@@ -17,12 +18,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
-import static com.weareadaptive.cluster.codec.Codec.decodeOMSHeader;
-import static com.weareadaptive.util.CodecConstants.HEADER_SIZE;
-
 public class ClusterService implements ClusteredService
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusteredService.class);
+    private final MessageHeaderDecoder headerDecoder = new MessageHeaderDecoder();
     private OMSService omsService;
     private final ClusterClientResponder clusterClientResponder = new ClusterClientResponderImpl();
     private int currentLeader = -1;
@@ -70,11 +69,22 @@ public class ClusterService implements ClusteredService
     {
         LOGGER.info("Client ID: " + session.id() + " Ingress");
 
-        final var customHeader = decodeOMSHeader(buffer, offset);
-        switch (customHeader.getServiceName())
+        int bufferOffset = offset;
+        headerDecoder.wrap(buffer, bufferOffset);
+
+        final int schemaId = headerDecoder.schemaId();
+        final int templateId = headerDecoder.templateId();
+        final int actingBlockLength = headerDecoder.blockLength();
+        final int actingVersion = headerDecoder.version();
+
+        bufferOffset += headerDecoder.encodedLength();
+        final var correlationId = headerDecoder.correlationId();
+        if (schemaId == MessageHeaderDecoder.SCHEMA_ID)
         {
-            case OMS -> omsService.messageHandler(session, customHeader, buffer, offset + HEADER_SIZE);
-            case NONE -> LOGGER.error("Bad service name");
+            omsService.messageHandler(session, correlationId, templateId, buffer, bufferOffset, actingBlockLength, actingVersion);
+        } else
+        {
+            LOGGER.error("Bad service name");
         }
     }
 

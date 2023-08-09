@@ -1,10 +1,10 @@
 package com.weareadaptive.gateway.client;
 
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
-import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Order;
 import com.weareadaptive.cluster.services.oms.util.Status;
 import com.weareadaptive.gateway.exception.BadFieldException;
+import com.weareadaptive.sbe.*;
 import io.aeron.cluster.client.EgressListener;
 import io.aeron.cluster.codecs.EventCode;
 import io.aeron.logbuffer.Header;
@@ -15,19 +15,23 @@ import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
-
-import static com.weareadaptive.gateway.codec.Decoder.*;
-import static com.weareadaptive.util.CodecConstants.ID_SIZE;
 
 public class ClientEgressListener implements EgressListener
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientEgressListener.class);
     private int currentLeader = -1;
     private final Map<Long, ServerWebSocket> allWebsockets = new ConcurrentHashMap<>();
-    private final Map<Long, Method> allMethods = new ConcurrentHashMap<>();
+    private final Map<Long, List<Order>> ordersRequests = new ConcurrentHashMap<>();
+    final ExecutionResult executionResult = new ExecutionResult();
+    private final MessageHeaderDecoder messageHeaderDecoder = new MessageHeaderDecoder();
+    private final OrderIdDecoder orderIdDecoder = new OrderIdDecoder();
+    private final ExecutionResultDecoder executionResultDecoder = new ExecutionResultDecoder();
+    private final SuccessMessageDecoder successMessageDecoder = new SuccessMessageDecoder();
+    private final OrderDecoder orderDecoder = new OrderDecoder();
 
     @Override
     public void onMessage(final long clusterSessionId, final long timestamp, final DirectBuffer buffer,
@@ -35,35 +39,50 @@ public class ClientEgressListener implements EgressListener
                           final Header header)
     {
         LOGGER.info("Message has been received");
-        long id = decodeLongId(buffer, offset);
-        if (allWebsockets.containsKey(id)) {
-            final var responseType = allMethods.get(id);
-            JsonObject sendThisMessage = getJsonObjectFromMessage(responseType, buffer, offset);
 
-            allWebsockets.get(id).write(sendThisMessage.toBuffer());
-            allWebsockets.remove(id);
-            allMethods.remove(id);
+        int bufferOffset = offset;
+        messageHeaderDecoder.wrap(buffer, bufferOffset);
+        final int typeOfMessage = messageHeaderDecoder.templateId();
+        final long correlationId = messageHeaderDecoder.correlationId();
+
+        if (allWebsockets.containsKey(correlationId))
+        {
+            final int actingBlockLength = messageHeaderDecoder.blockLength();
+            final int actingVersion = messageHeaderDecoder.version();
+            bufferOffset += messageHeaderDecoder.encodedLength();
+
+            if (typeOfMessage == OrderDecoder.TEMPLATE_ID) {
+                addOrderToCollectionOfAllOrders(correlationId, buffer, bufferOffset, actingBlockLength, actingVersion);
+            }
+            else
+            {
+                sendMessage(buffer, bufferOffset, typeOfMessage, correlationId, actingBlockLength, actingVersion);
+            }
         }
         else {
-            LOGGER.error("This ID is not in use: ".concat(String.valueOf(id)));
+            LOGGER.error("This ID is not in use: ".concat(String.valueOf(correlationId)));
         }
     }
 
-    private JsonObject getJsonObjectFromMessage(Method method, DirectBuffer buffer, int offset)
+    private void sendMessage(final DirectBuffer buffer, final int bufferOffset, final int typeOfMessage, final long correlationId,
+                             final int actingBlockLength, final int actingVersion)
     {
-        return switch (method)
-                {
-                    case CLEAR, RESET -> getSuccessMessageAsJson(buffer, offset + ID_SIZE);
-                    case PLACE, CANCEL -> getExecutionResultAsJson(buffer, offset + ID_SIZE);
-                    case CURRENT_ORDER_ID -> getOrderIdResponse(buffer, offset + ID_SIZE);
-                    case ASKS, BIDS -> getOrdersResponse(buffer, offset + ID_SIZE);
-                    default -> throw new BadFieldException("method not supported");
-                };
+        JsonObject jsonObject = switch (typeOfMessage)
+        {
+            case SuccessMessageDecoder.TEMPLATE_ID -> getSuccessMessageAsJson(buffer, bufferOffset, actingBlockLength, actingVersion);
+            case ExecutionResultDecoder.TEMPLATE_ID -> getExecutionResultAsJson(buffer, bufferOffset, actingBlockLength, actingVersion);
+            case OrderIdDecoder.TEMPLATE_ID -> getOrderIdResponse(buffer, bufferOffset, actingBlockLength, actingVersion);
+            case EndOfOrdersDecoder.TEMPLATE_ID -> getOrdersResponse(correlationId);
+            default -> throw new BadFieldException("method not supported");
+        };
+
+        allWebsockets.get(correlationId).write(jsonObject.toBuffer());
+        allWebsockets.remove(correlationId);
     }
 
-    private JsonObject getOrdersResponse(DirectBuffer buffer, int offset)
+    private JsonObject getOrdersResponse(final long correlationId)
     {
-        TreeSet<Order> orders = decodeOrders(offset, buffer);
+        List<Order> orders = ordersRequests.get(correlationId);
         JsonArray jsonArray = new JsonArray();
         for (Order order : orders) {
             JsonObject orderJson = JsonObject.mapFrom(order);
@@ -72,24 +91,31 @@ public class ClientEgressListener implements EgressListener
 
         JsonObject jsonObject = new JsonObject();
         jsonObject.put("orders", jsonArray);
+        LOGGER.info(jsonObject.toString());
         return jsonObject;
     }
 
-    private JsonObject getOrderIdResponse(DirectBuffer buffer, int offset)
+    private JsonObject getOrderIdResponse(final DirectBuffer buffer, final int offset, final int actingBlockLength, final int actingVersion)
     {
-        return JsonObject.of("orderId", decodeOrderIdResponse(offset, buffer));
+        orderIdDecoder.wrap(buffer, offset, actingBlockLength, actingVersion);
+        return JsonObject.of("orderId", orderIdDecoder.orderId());
     }
 
-    private JsonObject getExecutionResultAsJson(DirectBuffer buffer, int offset)
+    private JsonObject getExecutionResultAsJson(final DirectBuffer buffer, final int offset, final int actingBlockLength, final int actingVersion)
     {
-        final ExecutionResult executionResult = decodeExecutionResult(buffer, offset);
+        executionResultDecoder.wrap(buffer, offset, actingBlockLength, actingVersion);
+        final long orderId = executionResultDecoder.orderId();
+        final Status status = Status.fromByteValue((byte) executionResultDecoder.status());
+        executionResult.setStatus(status);
+        executionResult.setOrderId(orderId);
         LOGGER.info("Sending back ExecutionResult for OrderId %d with status %s".formatted(executionResult.getOrderId(), executionResult.getStatus().name()));
         return JsonObject.mapFrom(executionResult);
     }
 
-    private JsonObject getSuccessMessageAsJson(DirectBuffer buffer, int offset)
+    private JsonObject getSuccessMessageAsJson(final DirectBuffer buffer, final int offset, final int actingBlockLength, final int actingVersion)
     {
-        final Status status = decodeStatus(buffer, offset);
+        successMessageDecoder.wrap(buffer, offset, actingBlockLength, actingVersion);
+        final Status status = Status.fromByteValue((byte) successMessageDecoder.status());
         LOGGER.info("Sending back status %s".formatted(status.name()));
         return JsonObject.of("status", status.name());
     }
@@ -116,9 +142,16 @@ public class ClientEgressListener implements EgressListener
         return this.currentLeader;
     }
 
-    public void addWebsocket(long id, ServerWebSocket ws, Method method) {
+    public void addWebsocket(final long id, final ServerWebSocket ws) {
         allWebsockets.put(id, ws);
-        allMethods.put(id, method);
     }
 
+    public void addOrderToCollectionOfAllOrders(final long correlationId, final DirectBuffer buffer, final int offset, final int actingBlockLength, final int actingVersion) {
+        orderDecoder.wrap(buffer, offset, actingBlockLength, actingVersion);
+        final Order order = new Order(orderDecoder.orderId(), orderDecoder.price(), orderDecoder.size());
+        List<Order> listToUpdate = ordersRequests.getOrDefault(correlationId, new ArrayList<>());
+        listToUpdate.add(order);
+        LOGGER.info(order.toString());
+        ordersRequests.put(correlationId, listToUpdate);
+    }
 }

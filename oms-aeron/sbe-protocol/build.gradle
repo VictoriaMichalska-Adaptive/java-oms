@@ -2,7 +2,7 @@ plugins {
     id 'java'
 }
 
-group 'com.weareadaptive'
+group 'weareadaptive.com'
 version '1.0-SNAPSHOT'
 
 repositories {
@@ -18,7 +18,7 @@ dependencies {
 tasks.register('generateMessages', JavaExec) {
     main = 'uk.co.real_logic.sbe.SbeTool'
     classpath = sourceSets.main.runtimeClasspath
-    systemProperties('sbe.output.dir': file("${buildDir}/generated/src/main/java"),
+    systemProperties('sbe.output.dir': file("${buildDir}/generated/src/main"),
             'sbe.target.language': 'Java',
             'sbe.validation.stop.on.error': 'true',
             'sbe.validation.xsd': 'src/main/resources/sbe/sbe.xsd')

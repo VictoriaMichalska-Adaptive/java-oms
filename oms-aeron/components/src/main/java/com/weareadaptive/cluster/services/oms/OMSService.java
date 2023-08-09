@@ -1,12 +1,17 @@
 package com.weareadaptive.cluster.services.oms;
 
 import com.weareadaptive.cluster.ClusterNode;
-import com.weareadaptive.cluster.codec.SnapshotManager;
 import com.weareadaptive.cluster.services.infra.ClusterClientResponder;
 import com.weareadaptive.cluster.services.oms.util.ExecutionResult;
 import com.weareadaptive.cluster.services.oms.util.Method;
-import com.weareadaptive.cluster.services.util.CustomHeader;
-import com.weareadaptive.cluster.services.util.OrderRequestCommand;
+import com.weareadaptive.cluster.services.oms.util.Side;
+import com.weareadaptive.sbe.CancelRequestDecoder;
+import com.weareadaptive.sbe.ClearRequestDecoder;
+import com.weareadaptive.sbe.OrderRequestDecoder;
+import com.weareadaptive.sbe.ResetRequestDecoder;
+import com.weareadaptive.sbe.BidsRequestDecoder;
+import com.weareadaptive.sbe.AsksRequestDecoder;
+import com.weareadaptive.sbe.CurrentIdRequestDecoder;
 import io.aeron.ExclusivePublication;
 import io.aeron.Image;
 import io.aeron.cluster.service.ClientSession;
@@ -15,14 +20,13 @@ import org.agrona.concurrent.IdleStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.weareadaptive.cluster.codec.Codec.*;
-import static com.weareadaptive.util.CodecConstants.ID_SIZE;
-
 public class OMSService
 {
     private final SnapshotManager snapshotManager = new SnapshotManager();
     private OrderbookImpl orderbook = new OrderbookImpl();
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterNode.class);
+    private final OrderRequestDecoder orderRequestDecoder = new OrderRequestDecoder();
+    private final CancelRequestDecoder cancelRequestDecoder = new CancelRequestDecoder();
     private final ClusterClientResponder clusterClientResponder;
 
 
@@ -32,15 +36,16 @@ public class OMSService
         this.clusterClientResponder = clusterClientResponder;
     }
 
-    public void messageHandler(final ClientSession session, final CustomHeader customHeader, final DirectBuffer buffer, final int offset) {
-        final var method = customHeader.getMethod();
-        switch(method) {
-            case CANCEL -> cancelOrder(session, customHeader.getMessageId(), buffer, offset);
-            case PLACE -> placeOrder(session, customHeader.getMessageId(), buffer, offset);
-            case RESET -> resetOrderbook(session, customHeader.getMessageId());
-            case CLEAR -> clearOrderbook(session, customHeader.getMessageId());
-            case ASKS, BIDS -> getOrders(session, customHeader.getMessageId(), method);
-            case CURRENT_ORDER_ID -> getCurrentOrderId(session, customHeader.getMessageId());
+    public void messageHandler(final ClientSession session, final long correlationId, final int templateId, final DirectBuffer buffer, final int offset,
+                               int actingBlockLength, int actingVersion) {
+        switch(templateId) {
+            case CancelRequestDecoder.TEMPLATE_ID -> cancelOrder(session, correlationId, buffer, offset, actingBlockLength, actingVersion);
+            case OrderRequestDecoder.TEMPLATE_ID -> placeOrder(session, correlationId, buffer, offset, actingBlockLength, actingVersion);
+            case ResetRequestDecoder.TEMPLATE_ID -> resetOrderbook(session, correlationId);
+            case ClearRequestDecoder.TEMPLATE_ID -> clearOrderbook(session, correlationId);
+            case AsksRequestDecoder.TEMPLATE_ID  -> getOrders(session, correlationId, Method.ASKS);
+            case BidsRequestDecoder.TEMPLATE_ID  -> getOrders(session, correlationId, Method.BIDS);
+            case CurrentIdRequestDecoder.TEMPLATE_ID -> getCurrentOrderId(session, correlationId);
         }
     }
 
@@ -59,7 +64,8 @@ public class OMSService
         }
     }
 
-    private void placeOrder(final ClientSession session, final long messageId, final DirectBuffer buffer, final int offset)
+    private void placeOrder(final ClientSession session, final long messageId, final DirectBuffer buffer, final int offset,
+                            int actingBlockLength, int actingVersion)
     {
         /*
          * * Receive Ingress binary encoding and place order in Orderbook
@@ -68,16 +74,20 @@ public class OMSService
          *      - Encode a response
          *      - Offer Egress back to cluster client
          */
-        final OrderRequestCommand order = decodeOrderRequest(buffer, offset);
+        orderRequestDecoder.wrap(buffer, offset, actingBlockLength, actingVersion);
+        final double orderPrice = orderRequestDecoder.price();
+        final long orderSize = orderRequestDecoder.size();
+        final Side orderSide = Side.fromByteValue((byte) orderRequestDecoder.side());
 
-        LOGGER.info(String.format("%s order is being placed for %d at %f", order.getSide().toString(), order.getSize(), order.getPrice()));
-        final ExecutionResult executionResult = orderbook.placeOrder(order.getPrice(), order.getSize(), order.getSide());
+        LOGGER.info(String.format("%s order is being placed for %d at %f", orderSide, orderSize, orderPrice));
+        final ExecutionResult executionResult = orderbook.placeOrder(orderPrice, orderSize, orderSide);
 
         clusterClientResponder.onExecutionResult(session, messageId, executionResult);
     }
 
 
-    private void cancelOrder(final ClientSession session, final long correlationId, final DirectBuffer buffer, final int offset)
+    private void cancelOrder(final ClientSession session, final long correlationId, final DirectBuffer buffer, final int offset,
+                             int actingBlockLength, int actingVersion)
     {
         /*
          * * Receive Ingress binary encoding and cancel order in Orderbook
@@ -86,10 +96,8 @@ public class OMSService
          *      - Encode a response
          *      - Offer Egress back to cluster client
          */
-        int position = offset;
-
-        position += ID_SIZE;
-        long orderId = decodeLongId(buffer, position);
+        cancelRequestDecoder.wrap(buffer, offset, actingBlockLength, actingVersion);
+        final long orderId = cancelRequestDecoder.orderId();
 
         LOGGER.info("Cancelling order " + orderId);
         final ExecutionResult executionResult = orderbook.cancelOrder(orderId);

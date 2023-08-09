@@ -2,10 +2,10 @@ package com.weareadaptive.gateway.ws;
 
 import com.weareadaptive.cluster.services.oms.util.Method;
 import com.weareadaptive.cluster.services.oms.util.Side;
-import com.weareadaptive.cluster.services.util.ServiceName;
 import com.weareadaptive.gateway.client.ClientEgressListener;
 import com.weareadaptive.gateway.client.ClientIngressSender;
 import com.weareadaptive.gateway.exception.BadFieldException;
+import com.weareadaptive.sbe.*;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.ServerWebSocket;
 import io.vertx.core.json.JsonObject;
@@ -14,16 +14,19 @@ import org.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
 
-import static com.weareadaptive.gateway.codec.Encoder.*;
-import static com.weareadaptive.util.CodecConstants.*;
-
 public class WebSocketServer extends AbstractVerticle
 {
     ClientIngressSender clientIngressSender;
     ClientEgressListener clientEgressListener;
     private long id = 0L;
-    // todo: actually use the header encoder
-    final com.weareadaptive.sbe.MessageHeaderEncoder headerEncoder = new com.weareadaptive.sbe.MessageHeaderEncoder();
+    final MessageHeaderEncoder headerEncoder = new MessageHeaderEncoder();
+    final OrderRequestEncoder orderRequestEncoder = new OrderRequestEncoder();
+    final CancelRequestEncoder cancelOrderEncoder = new CancelRequestEncoder();
+    final private AsksRequestEncoder asksRequestEncoder = new AsksRequestEncoder();
+    final private BidsRequestEncoder bidsRequestEncoder = new BidsRequestEncoder();
+    final private ResetRequestEncoder resetRequestEncoder = new ResetRequestEncoder();
+    final private ClearRequestEncoder clearRequestEncoder = new ClearRequestEncoder();
+    final private CurrentIdRequestEncoder currentIdRequestEncoder = new CurrentIdRequestEncoder();
 
     public WebSocketServer(final ClientIngressSender clientIngressSender,
                            final ClientEgressListener clientEgressListener)
@@ -80,6 +83,11 @@ public class WebSocketServer extends AbstractVerticle
         });
     }
 
+    private void setHeaderEncoder(final MutableDirectBuffer buffer, final long correlationId) {
+        headerEncoder.wrap(buffer, 0);
+        headerEncoder.correlationId(correlationId);
+    }
+
     /**
      * * Handle request into Orderbook, return ExecutionResult response to client
      * <p>
@@ -100,21 +108,27 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "FILLED"
      * }
      */
-    private void WSPlaceOrder(final ServerWebSocket ws, long messageId, JsonObject jsonEvent)
+    private void WSPlaceOrder(final ServerWebSocket ws, long correlationId, JsonObject jsonEvent)
     {
         if (jsonEvent == null) { throw new BadFieldException("order"); }
         if (jsonEvent.getDouble("price") == null) { throw new BadFieldException("price"); }
         if (jsonEvent.getLong("size") == null) { throw new BadFieldException("size"); }
         if (jsonEvent.getString("side") == null) { throw new BadFieldException("side"); }
 
-        clientEgressListener.addWebsocket(messageId, ws, Method.PLACE);
+        clientEgressListener.addWebsocket(correlationId, ws);
 
-        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE + ORDER_REQUEST_SIZE));
-        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.PLACE, id), 0, HEADER_SIZE);
-        buffer.putBytes(HEADER_SIZE, encodeOrderRequest(jsonEvent.getDouble("price"),
-                jsonEvent.getLong("size"), Side.valueOf(jsonEvent.getString("side"))), 0, ORDER_REQUEST_SIZE);
+        int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + OrderRequestEncoder.BLOCK_LENGTH;
+        final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(encodedLength);
+        final UnsafeBuffer directBuffer = new UnsafeBuffer(byteBuffer);
 
-        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE + ORDER_REQUEST_SIZE);
+        setHeaderEncoder(directBuffer, correlationId);
+        orderRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
+
+        orderRequestEncoder.price(jsonEvent.getDouble("price"));
+        orderRequestEncoder.size(jsonEvent.getLong("size"));
+        orderRequestEncoder.side(Side.valueOf(jsonEvent.getString("side")).getByte());
+
+        clientIngressSender.sendMessageToCluster(directBuffer, encodedLength);
     }
 
     /**
@@ -132,25 +146,37 @@ public class WebSocketServer extends AbstractVerticle
      * "status": "CANCELLED"
      * }
      */
-    private void WSCancelOrder(final ServerWebSocket ws, long messageId, long orderId)
+    private void WSCancelOrder(final ServerWebSocket ws, long correlationId, long orderId)
     {
-        System.out.println("messageId " + messageId);
-        System.out.println("orderId " + orderId);
+        clientEgressListener.addWebsocket(correlationId, ws);
 
-        clientEgressListener.addWebsocket(messageId, ws, Method.CANCEL);
-        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE + ID_SIZE));
-        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, Method.CANCEL, messageId), 0, HEADER_SIZE);
-        buffer.putBytes(HEADER_SIZE, encodeId(orderId), 0, ID_SIZE);
+        int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + CancelRequestEncoder.BLOCK_LENGTH;
+        final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(encodedLength);
+        final UnsafeBuffer directBuffer = new UnsafeBuffer(byteBuffer);
 
-        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE + ID_SIZE);
+        setHeaderEncoder(directBuffer, correlationId);
+        cancelOrderEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
+        cancelOrderEncoder.orderId(orderId);
+
+        clientIngressSender.sendMessageToCluster(directBuffer, encodedLength);
     }
 
-    private void WSHeaderMessage(final ServerWebSocket ws, final long messageId, final Method method)
+    private void WSHeaderMessage(final ServerWebSocket ws, final long correlationId, final Method method)
     {
-        clientEgressListener.addWebsocket(messageId, ws, method);
-        MutableDirectBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(HEADER_SIZE));
-        buffer.putBytes(0, encodeOMSHeader(ServiceName.OMS, method, id), 0, HEADER_SIZE);
+        clientEgressListener.addWebsocket(correlationId, ws);
+        int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH;
+        final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(encodedLength);
+        final UnsafeBuffer directBuffer = new UnsafeBuffer(byteBuffer);
 
-        clientIngressSender.sendMessageToCluster(buffer, HEADER_SIZE);
+        setHeaderEncoder(directBuffer, correlationId);
+
+        switch (method) {
+            case CLEAR -> clearRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
+            case RESET -> resetRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
+            case BIDS -> bidsRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
+            case ASKS -> asksRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
+            case CURRENT_ORDER_ID -> currentIdRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
+        }
+        clientIngressSender.sendMessageToCluster(directBuffer, encodedLength);
     }
 }
