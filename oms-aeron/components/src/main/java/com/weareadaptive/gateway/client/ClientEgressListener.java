@@ -38,8 +38,6 @@ public class ClientEgressListener implements EgressListener
                           final int offset, final int length,
                           final Header header)
     {
-        LOGGER.info("Message has been received");
-
         int bufferOffset = offset;
         messageHeaderDecoder.wrap(buffer, bufferOffset);
         final int typeOfMessage = messageHeaderDecoder.templateId();
@@ -91,7 +89,6 @@ public class ClientEgressListener implements EgressListener
 
         JsonObject jsonObject = new JsonObject();
         jsonObject.put("orders", jsonArray);
-        LOGGER.info(jsonObject.toString());
         return jsonObject;
     }
 
@@ -108,7 +105,6 @@ public class ClientEgressListener implements EgressListener
         final Status status = Status.fromByteValue((byte) executionResultDecoder.status());
         executionResult.setStatus(status);
         executionResult.setOrderId(orderId);
-        LOGGER.info("Sending back ExecutionResult for OrderId %d with status %s".formatted(executionResult.getOrderId(), executionResult.getStatus().name()));
         return JsonObject.mapFrom(executionResult);
     }
 
@@ -116,7 +112,6 @@ public class ClientEgressListener implements EgressListener
     {
         successMessageDecoder.wrap(buffer, offset, actingBlockLength, actingVersion);
         final Status status = Status.fromByteValue((byte) successMessageDecoder.status());
-        LOGGER.info("Sending back status %s".formatted(status.name()));
         return JsonObject.of("status", status.name());
     }
 
@@ -151,7 +146,6 @@ public class ClientEgressListener implements EgressListener
         final Order order = new Order(orderDecoder.orderId(), orderDecoder.price(), orderDecoder.size());
         List<Order> listToUpdate = ordersRequests.getOrDefault(correlationId, new ArrayList<>());
         listToUpdate.add(order);
-        LOGGER.info(order.toString());
         ordersRequests.put(correlationId, listToUpdate);
     }
 }

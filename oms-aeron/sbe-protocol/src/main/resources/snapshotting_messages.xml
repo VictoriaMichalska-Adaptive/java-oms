@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="com.weareadaptive.sbe.snapshotting"
+                   id="900"
+                   version="1"
+                   semanticVersion="0.1"
+                   description="SBE Messages for Snapshotting Service">
+    <types>
+        <type name="orderId" primitiveType="uint64"/>
+        <type name="price" primitiveType="double"/>
+        <type name="size" primitiveType="uint64"/>
+        <composite name="messageHeader" description="Service name, method name, and correlation ID">
+            <type name="schemaId" primitiveType="uint16"/>
+            <type name="templateId" primitiveType="uint16"/>
+            <type name="blockLength" primitiveType="uint16"/>
+            <type name="version" primitiveType="uint16"/>
+        </composite>
+    </types>
+    <sbe:message name="askOrder" id="1">
+        <field name="orderId" id="1" type="orderId"/>
+        <field name="price" id="2" type="price"/>
+        <field name="size" id="3" type="size"/>
+    </sbe:message>
+    <sbe:message name="bidOrder" id="2">
+        <field name="orderId" id="1" type="orderId"/>
+        <field name="price" id="2" type="price"/>
+        <field name="size" id="3" type="size"/>
+    </sbe:message>
+    <sbe:message name="orderId" id="3">
+        <field name="orderId" id="1" type="orderId"/>
+    </sbe:message>
+    <sbe:message name="endOfSnapshot" id="4"/>
+</sbe:messageSchema>

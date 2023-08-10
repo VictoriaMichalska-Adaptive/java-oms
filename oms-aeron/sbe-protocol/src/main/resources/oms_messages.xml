@@ -4,7 +4,7 @@
                    id="688"
                    version="1"
                    semanticVersion="0.1"
-                   description="Sample SBE Messages">
+                   description="SBE Messages for our FX Service">
     <types>
         <type name="orderId" primitiveType="uint64"/>
         <type name="price" primitiveType="double"/>
@@ -17,10 +17,6 @@
             <type name="blockLength" primitiveType="uint16"/>
             <type name="version" primitiveType="uint16"/>
             <type name="correlationId" primitiveType="uint64"/>
-        </composite>
-        <composite name="groupSizeEncoding">
-            <type name="blockLength" primitiveType="uint16"/>
-            <type name="numInGroup" primitiveType="uint16"/>
         </composite>
     </types>
 

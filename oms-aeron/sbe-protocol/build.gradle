@@ -23,7 +23,8 @@ tasks.register('generateMessages', JavaExec) {
             'sbe.validation.stop.on.error': 'true',
             'sbe.validation.xsd': 'src/main/resources/sbe/sbe.xsd')
     args = [
-            'src/main/resources/oms_messages.xml'
+            'src/main/resources/oms_messages.xml',
+            'src/main/resources/snapshotting_messages.xml'
     ]
 }
 

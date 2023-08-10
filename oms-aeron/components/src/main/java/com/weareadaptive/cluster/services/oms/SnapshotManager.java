@@ -1,10 +1,10 @@
 package com.weareadaptive.cluster.services.oms;
 
 import com.weareadaptive.cluster.services.oms.util.Order;
-import com.weareadaptive.cluster.services.oms.util.Side;
-import com.weareadaptive.cluster.services.util.SnapshotHeader;
+import com.weareadaptive.sbe.snapshotting.*;
 import io.aeron.ExclusivePublication;
 import io.aeron.Image;
+import io.aeron.Publication;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.logbuffer.Header;
 import org.agrona.DirectBuffer;
@@ -22,104 +22,114 @@ import java.util.TreeSet;
 public class SnapshotManager implements FragmentHandler
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(SnapshotManager.class);
+    private static final int RETRY_COUNT = 3;
     private boolean snapshotFullyLoaded = false;
     private IdleStrategy idleStrategy;
     public OrderbookImpl orderbook = new OrderbookImpl();
-    public static int ORDER_SIZE = Long.BYTES + Double.BYTES + Long.BYTES;
-    private final MutableDirectBuffer currentIdBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Byte.BYTES + Long.BYTES));
-    private final MutableDirectBuffer endOfSnapshotBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Byte.BYTES));
+
+    private final MessageHeaderEncoder messageHeaderEncoder = new MessageHeaderEncoder();
+    private final MessageHeaderDecoder messageHeaderDecoder = new MessageHeaderDecoder();
+    private final OrderIdEncoder orderIdEncoder = new OrderIdEncoder();
+    private final OrderIdDecoder orderIdDecoder = new OrderIdDecoder();
+    private final EndOfSnapshotEncoder endOfSnapshotEncoder = new EndOfSnapshotEncoder();
+    private final AskOrderEncoder askOrderEncoder = new AskOrderEncoder();
+    private final AskOrderDecoder askOrderDecoder = new AskOrderDecoder();
+    private final BidOrderEncoder bidOrderEncoder = new BidOrderEncoder();
+    private final BidOrderDecoder bidOrderDecoder = new BidOrderDecoder();
+    private final int askBufferLength = MessageHeaderEncoder.ENCODED_LENGTH + AskOrderEncoder.BLOCK_LENGTH;
+    private final int bidBufferLength = MessageHeaderEncoder.ENCODED_LENGTH + BidOrderEncoder.BLOCK_LENGTH;
+    private final int currentIdLength = MessageHeaderEncoder.ENCODED_LENGTH + OrderIdEncoder.BLOCK_LENGTH;
+
+    private final MutableDirectBuffer askOrderBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(askBufferLength));
+    private final MutableDirectBuffer bidOrderBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(bidBufferLength));
+    private final MutableDirectBuffer currentIdBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(currentIdLength));
+    private final int endOfSnapshotLength = MessageHeaderEncoder.ENCODED_LENGTH + EndOfSnapshotEncoder.BLOCK_LENGTH;
+    private final MutableDirectBuffer endOfSnapshotBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(endOfSnapshotLength));
 
     public void encodeOrderbookState(ExclusivePublication snapshotPublication, TreeSet<Order> asks, TreeSet<Order> bids, long currentOrderId)
     {
         LOGGER.info("Starting snapshot...");
-        snapshotPublication.offer(encodeOrdersToBuffer(asks, Side.ASK));
-        snapshotPublication.offer(encodeOrdersToBuffer(bids, Side.BID));
-        snapshotPublication.offer(encodeCurrentIdsToBuffer(currentOrderId));
-        snapshotPublication.offer(encodeEndOfSnapshotBuffer());
+        offerAskOrders(snapshotPublication, asks);
+        offerBidOrders(snapshotPublication, bids);
+        offerCurrentId(snapshotPublication, currentOrderId);
+        offerEndOfSnapshot(snapshotPublication);
         LOGGER.info("Snapshot complete");
     }
 
-    private DirectBuffer encodeEndOfSnapshotBuffer()
+    private void offerEndOfSnapshot(ExclusivePublication publication)
     {
-        endOfSnapshotBuffer.putByte(0, SnapshotHeader.END_OF_SNAPSHOT.getByte());
-        return endOfSnapshotBuffer;
+        endOfSnapshotEncoder.wrapAndApplyHeader(endOfSnapshotBuffer, 0, messageHeaderEncoder);
+
+        retryingOffer(publication, endOfSnapshotBuffer, endOfSnapshotLength);
     }
 
-    private DirectBuffer encodeCurrentIdsToBuffer(long currentOrderId)
+    private void offerCurrentId(final ExclusivePublication publication, final long currentOrderId)
     {
-        int position = 0;
-        currentIdBuffer.putByte(position, SnapshotHeader.ORDER_IDS.getByte());
-        position += Byte.BYTES;
-        currentIdBuffer.putLong(position, currentOrderId);
-        return currentIdBuffer;
+        orderIdEncoder.wrapAndApplyHeader(currentIdBuffer, 0, messageHeaderEncoder);
+        orderIdEncoder.orderId(currentOrderId);
+
+        retryingOffer(publication, currentIdBuffer, currentIdLength);
     }
 
-
-    public Order decodeOrder(int position, DirectBuffer buffer) {
-        int pos = position;
-        long orderId = buffer.getLong(pos);
-        pos += Long.BYTES;
-        double price = buffer.getDouble(pos);
-        pos += Double.BYTES;
-        long size = buffer.getLong(pos);
-        pos += Long.BYTES;
-        return new Order(orderId, price, size);
-    }
-
-    private MutableDirectBuffer encodeOrdersToBuffer(SortedSet<Order> orders, Side side)
+    private void offerAskOrders(ExclusivePublication publication, SortedSet<Order> orders)
     {
-        MutableDirectBuffer ordersBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Byte.BYTES + Integer.BYTES + (ORDER_SIZE * orders.size())));
-        int position = 0;
-        SnapshotHeader snapshotHeader = side == Side.BID ? SnapshotHeader.BIDS : SnapshotHeader.ASKS;
-        ordersBuffer.putByte(position, snapshotHeader.getByte());
-        position += Byte.BYTES;
-        ordersBuffer.putInt(position, orders.size());
-        position += Integer.BYTES;
-        for (Order order : orders)
-        {
-            ordersBuffer.putLong(position, order.getOrderId());
-            position += Long.BYTES;
-            ordersBuffer.putDouble(position, order.getPrice());
-            position += Double.BYTES;
-            ordersBuffer.putLong(position, order.getSize());
-            position += Long.BYTES;
+        for (Order order : orders) {
+            askOrderEncoder.wrapAndApplyHeader(askOrderBuffer, 0, messageHeaderEncoder);
+
+            askOrderEncoder.orderId(order.getOrderId());
+            askOrderEncoder.price(order.getPrice());
+            askOrderEncoder.size(order.getSize());
+            retryingOffer(publication, askOrderBuffer, askBufferLength);
         }
-        return ordersBuffer;
     }
-
-    private TreeSet<Order> decodeOrders(int pos, DirectBuffer buffer)
+    private void offerBidOrders(ExclusivePublication publication, SortedSet<Order> orders)
     {
-        TreeSet<Order> orders = new TreeSet<>();
-        int currentPosition = pos;
-        int totalNumberOfOrders = buffer.getInt(currentPosition);
-        currentPosition += Integer.BYTES;
-        for (int i = 0; i < totalNumberOfOrders; i++)
-        {
-            orders.add(decodeOrder(currentPosition, buffer));
-            currentPosition += ORDER_SIZE;
+        for (Order order : orders) {
+            bidOrderEncoder.wrapAndApplyHeader(bidOrderBuffer, 0, messageHeaderEncoder);
+
+            bidOrderEncoder.orderId(order.getOrderId());
+            bidOrderEncoder.price(order.getPrice());
+            bidOrderEncoder.size(order.getSize());
+
+            retryingOffer(publication, bidOrderBuffer, bidBufferLength);
         }
-        return orders;
-    }
-
-    private static long decodeCurrentOrderId(int pos, DirectBuffer buffer)
-    {
-        return buffer.getLong(pos);
     }
 
     @Override
     public void onFragment(DirectBuffer buffer, int offset, int length, Header header)
     {
-        if (length < Byte.BYTES) {
+        if (length < MessageHeaderDecoder.ENCODED_LENGTH) {
             return;
         }
 
-        final int updatedOffset = offset + Byte.BYTES;
-        SnapshotHeader snapshotHeader = SnapshotHeader.fromByteValue(buffer.getByte(offset));
-        switch (snapshotHeader) {
-            case ASKS -> orderbook.setAsks(decodeOrders(updatedOffset, buffer));
-            case BIDS -> orderbook.setBids(decodeOrders(updatedOffset, buffer));
-            case ORDER_IDS -> orderbook.setCurrentOrderId(decodeCurrentOrderId(updatedOffset, buffer));
-            case END_OF_SNAPSHOT -> snapshotFullyLoaded = true;
+        messageHeaderDecoder.wrap(buffer, offset);
+        final int templateId = messageHeaderDecoder.templateId();
+        final int actingBlockLength = messageHeaderDecoder.blockLength();
+        final int actingVersion = messageHeaderDecoder.version();
+
+        final int updatedOffset = offset + messageHeaderDecoder.encodedLength();
+        switch (templateId) {
+            case AskOrderDecoder.TEMPLATE_ID -> {
+                askOrderDecoder.wrap(buffer, updatedOffset, actingBlockLength, actingVersion);
+                final long orderId = askOrderDecoder.orderId();
+                final double price = askOrderDecoder.price();
+                final long size = askOrderDecoder.size();
+                orderbook.getAsks().add(new Order(orderId, price, size));
+            }
+            case BidOrderDecoder.TEMPLATE_ID -> {
+                bidOrderDecoder.wrap(buffer, updatedOffset, actingBlockLength, actingVersion);
+                final long orderId = bidOrderDecoder.orderId();
+                final double price = bidOrderDecoder.price();
+                final long size = bidOrderDecoder.size();
+                orderbook.getBids().add(new Order(orderId, price, size));
+            }
+            case OrderIdDecoder.TEMPLATE_ID -> {
+                orderIdDecoder.wrap(buffer, updatedOffset, actingBlockLength, actingVersion);
+                final long orderId = orderIdDecoder.orderId();
+                orderbook.setCurrentOrderId(orderId);
+            }
+            case EndOfSnapshotDecoder.TEMPLATE_ID -> snapshotFullyLoaded = true;
+            default -> LOGGER.warn("Unknown snapshot message template id: {}", templateId);
         }
     }
 
@@ -146,5 +156,33 @@ public class SnapshotManager implements FragmentHandler
     public void setIdleStrategy(final IdleStrategy idleStrategy)
     {
         this.idleStrategy = idleStrategy;
+    }
+
+    private void retryingOffer(final ExclusivePublication publication, final DirectBuffer buffer, final int length)
+    {
+        final int offset = 0;
+        int retries = 0;
+        do
+        {
+            final long result = publication.offer(buffer, offset, length);
+            if (result >= 0L)
+            {
+                return;
+            }
+            else if (result == Publication.ADMIN_ACTION || result == Publication.BACK_PRESSURED)
+            {
+                LOGGER.warn("backpressure or admin action on snapshot");
+            }
+            else if (result == Publication.NOT_CONNECTED || result == Publication.MAX_POSITION_EXCEEDED)
+            {
+                LOGGER.error("unexpected publication state on snapshot: {}", result);
+                return;
+            }
+            idleStrategy.idle();
+            retries += 1;
+        }
+        while (retries < RETRY_COUNT);
+
+        LOGGER.error("failed to offer snapshot within {} retries", RETRY_COUNT);
     }
 }

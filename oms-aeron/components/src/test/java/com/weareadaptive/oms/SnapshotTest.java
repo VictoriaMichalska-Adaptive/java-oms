@@ -53,6 +53,8 @@ public class SnapshotTest
     @Test
     public void clusterCanRecoverToStateFromSnapshot(final VertxTestContext testContext) throws Throwable
     {
+
+        // todo: research awaitability
         CountDownLatch shutdownLatch = new CountDownLatch(3);
         CountDownLatch idLatch = new CountDownLatch(2);
         AtomicReference<List<TestOrder>> asks = new AtomicReference<>(null);
@@ -109,7 +111,8 @@ public class SnapshotTest
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.ASK, webSocket, asks.get(), null));
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.BID, webSocket, bids.get(), testContext));
 
-        assertTrue(testContext.awaitCompletion(10, TimeUnit.SECONDS));
+        assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
+
     }
 
     private List<TestOrder> makeTwoOrdersAndCheckThatTheyOccurred(OrderCommand orderCommand, CountDownLatch bootupLatch,
