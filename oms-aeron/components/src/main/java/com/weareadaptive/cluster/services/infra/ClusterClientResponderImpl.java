@@ -27,10 +27,10 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
     {
         int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + ExecutionResultEncoder.BLOCK_LENGTH;
         MutableDirectBuffer directBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(encodedLength));
-        messageHeaderEncoder.wrap(directBuffer, 0);
-        messageHeaderEncoder.correlationId(correlationId);
 
         executionResultEncoder.wrapAndApplyHeader(directBuffer, 0, messageHeaderEncoder);
+
+        messageHeaderEncoder.correlationId(correlationId);
         executionResultEncoder.orderId(executionResult.getOrderId());
         executionResultEncoder.status(executionResult.getStatus().getByte());
         while (session.offer(directBuffer, 0, encodedLength) < 0);
@@ -41,10 +41,9 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
     {
         final int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + SuccessMessageEncoder.BLOCK_LENGTH;
         MutableDirectBuffer directBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(encodedLength));
-        messageHeaderEncoder.wrap(directBuffer, 0);
-        messageHeaderEncoder.correlationId(correlationId);
 
         successMessageEncoder.wrapAndApplyHeader(directBuffer, 0, messageHeaderEncoder);
+        messageHeaderEncoder.correlationId(correlationId);
         successMessageEncoder.status(Status.SUCCESS.getByte());
         while (session.offer(directBuffer, 0, encodedLength) < 0);
     }
@@ -54,9 +53,8 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
     {
         int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + OrderEncoder.BLOCK_LENGTH;
         MutableDirectBuffer directBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(encodedLength));
-        messageHeaderEncoder.wrap(directBuffer, 0);
-        messageHeaderEncoder.correlationId(correlationId);
         orderEncoder.wrapAndApplyHeader(directBuffer, 0, messageHeaderEncoder);
+        messageHeaderEncoder.correlationId(correlationId);
 
         for (Order order : orders)
         {
@@ -66,12 +64,11 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
             while (session.offer(directBuffer, 0, encodedLength) < 0);
         }
 
-        // todo: figure out what wrap and wrapAndApplyHeader actually do with the offset
         MutableDirectBuffer endOfOrdersBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(MessageHeaderEncoder.ENCODED_LENGTH));
-        messageHeaderEncoder.wrap(endOfOrdersBuffer, 0);
-        messageHeaderEncoder.correlationId(correlationId);
-        
+
         endOfOrdersEncoder.wrapAndApplyHeader(endOfOrdersBuffer, 0, messageHeaderEncoder);
+        messageHeaderEncoder.correlationId(correlationId);
+
         while (session.offer(endOfOrdersBuffer, 0, MessageHeaderEncoder.ENCODED_LENGTH) < 0);
     }
 
@@ -80,10 +77,9 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
     {
         int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + OrderIdEncoder.BLOCK_LENGTH;
         MutableDirectBuffer directBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(encodedLength));
-        messageHeaderEncoder.wrap(directBuffer, 0);
-        messageHeaderEncoder.correlationId(correlationId);
 
         orderIdEncoder.wrapAndApplyHeader(directBuffer, 0, messageHeaderEncoder);
+        messageHeaderEncoder.correlationId(correlationId);
         orderIdEncoder.orderId(currentOrderId);
         while (session.offer(directBuffer, 0, encodedLength) < 0);
     }
