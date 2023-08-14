@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+}
+
+group 'weareadaptive.com.sbe'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+    testImplementation 'io.vertx:vertx-core:4.4.0'
+    testImplementation 'io.vertx:vertx-junit5:4.4.0'
+    testImplementation 'io.aeron:aeron-test-support:1.41.2'
+    implementation project(':cluster')
+    implementation project(':gateway')
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(Test).configureEach {
+    jvmArgs '--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED'
+}
