@@ -164,6 +164,7 @@ public class SnapshotManager implements FragmentHandler
         int retries = 0;
         do
         {
+            idleStrategy.reset();
             final long result = publication.offer(buffer, offset, length);
             if (result >= 0L)
             {

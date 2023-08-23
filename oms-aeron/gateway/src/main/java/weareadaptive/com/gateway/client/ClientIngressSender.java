@@ -1,28 +1,23 @@
 package weareadaptive.com.gateway.client;
 
-import com.weareadaptive.sbe.*;
+import io.aeron.Publication;
 import io.aeron.cluster.client.AeronCluster;
 import org.agrona.MutableDirectBuffer;
-import org.agrona.concurrent.UnsafeBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import weareadaptive.com.cluster.services.oms.util.Method;
 import weareadaptive.com.cluster.services.oms.util.Side;
 
-import java.nio.ByteBuffer;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class ClientIngressSender
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientIngressSender.class);
-    final OrderRequestEncoder orderRequestEncoder = new OrderRequestEncoder();
-    final CancelRequestEncoder cancelOrderEncoder = new CancelRequestEncoder();
-    final private AsksRequestEncoder asksRequestEncoder = new AsksRequestEncoder();
-    final private BidsRequestEncoder bidsRequestEncoder = new BidsRequestEncoder();
-    final private ResetRequestEncoder resetRequestEncoder = new ResetRequestEncoder();
-    final private ClearRequestEncoder clearRequestEncoder = new ClearRequestEncoder();
-    final private CurrentIdRequestEncoder currentIdRequestEncoder = new CurrentIdRequestEncoder();
-    final MessageHeaderEncoder headerEncoder = new MessageHeaderEncoder();
-    AeronCluster aeronCluster;
+    final private AeronCluster aeronCluster;
+    final private Queue<MutableDirectBuffer> bufferQueue = new LinkedList<>();
+    final private Queue<Integer> lengthQueue = new LinkedList<>();
+    final private Encoder encoder = new Encoder();
 
     public ClientIngressSender(final AeronCluster aeronCluster)
     {
@@ -30,57 +25,34 @@ public class ClientIngressSender
     }
 
     public void sendMessageToCluster(MutableDirectBuffer buffer, int length) {
-        while (aeronCluster.offer(buffer, 0, length) < 0);
-    }
+        int offerResponse = 0;
+        bufferQueue.add(buffer);
+        lengthQueue.add(length);
+        while (!bufferQueue.isEmpty() && !lengthQueue.isEmpty()) {
+            offerResponse = (int) aeronCluster.offer(bufferQueue.poll(), 0, lengthQueue.poll());
+            if (offerResponse != 0) break;
+        }
 
-    private void setHeaderEncoder(final MutableDirectBuffer buffer, final long correlationId) {
-        headerEncoder.wrap(buffer, 0);
-        headerEncoder.correlationId(correlationId);
+        if (offerResponse == (int) Publication.MAX_POSITION_EXCEEDED ||
+                offerResponse == (int) Publication.CLOSED ||
+                offerResponse == (int) Publication.NOT_CONNECTED)
+            {
+                bufferQueue.clear();
+                lengthQueue.clear();
+            }
     }
 
     public void sendOrderRequestToCluster(final long correlationId, final double price, final long size, final Side side) {
-        int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + OrderRequestEncoder.BLOCK_LENGTH;
-        final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(encodedLength);
-        final UnsafeBuffer directBuffer = new UnsafeBuffer(byteBuffer);
-
-        setHeaderEncoder(directBuffer, correlationId);
-        orderRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
-
-        orderRequestEncoder.price(price);
-        orderRequestEncoder.size(size);
-        orderRequestEncoder.side(side.getByte());
-
-        sendMessageToCluster(directBuffer, encodedLength);
+        sendMessageToCluster(encoder.encodeOrderRequest(correlationId, price, size, side), encoder.ORDER_REQUEST_LENGTH);
     }
 
     public void sendCancelOrderToCluster(final long correlationId, final long orderId)
     {
-        int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH + CancelRequestEncoder.BLOCK_LENGTH;
-        final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(encodedLength);
-        final UnsafeBuffer directBuffer = new UnsafeBuffer(byteBuffer);
-
-        setHeaderEncoder(directBuffer, correlationId);
-        cancelOrderEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
-        cancelOrderEncoder.orderId(orderId);
-
-        sendMessageToCluster(directBuffer, encodedLength);
+        sendMessageToCluster(encoder.encodeCancelOrder(correlationId, orderId), encoder.CANCEL_ORDER_LENGTH);
     }
 
     public void sendHeaderMessageToCluster(long correlationId, Method method)
     {
-        int encodedLength = MessageHeaderEncoder.ENCODED_LENGTH;
-        final ByteBuffer byteBuffer = ByteBuffer.allocateDirect(encodedLength);
-        final UnsafeBuffer directBuffer = new UnsafeBuffer(byteBuffer);
-
-        setHeaderEncoder(directBuffer, correlationId);
-
-        switch (method) {
-            case CLEAR -> clearRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
-            case RESET -> resetRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
-            case BIDS -> bidsRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
-            case ASKS -> asksRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
-            case CURRENT_ORDER_ID -> currentIdRequestEncoder.wrapAndApplyHeader(directBuffer, 0, headerEncoder);
-        }
-        sendMessageToCluster(directBuffer, encodedLength);
+        sendMessageToCluster(encoder.encodeHeaderMessage(correlationId, method), encoder.HEADER_LENGTH);
     }
 }

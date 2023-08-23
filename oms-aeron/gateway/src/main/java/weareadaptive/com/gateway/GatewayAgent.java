@@ -53,8 +53,6 @@ public class GatewayAgent implements Agent
         {
             vertx.deployVerticle(webSocketServer, testContext);
             LOGGER.info("Websocket started with testContext...");
-
-
         }
         else {
             vertx.deployVerticle(webSocketServer);
@@ -110,7 +108,7 @@ public class GatewayAgent implements Agent
         }
         if (null != aeronCluster && !aeronCluster.isClosed())
         {
-            aeronCluster.pollEgress();
+            return aeronCluster.pollEgress();
         }
         return 0;
     }

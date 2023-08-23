@@ -17,6 +17,7 @@
 package weareadaptive.com.cluster.services.infra;
 
 import io.aeron.cluster.service.ClientSession;
+import org.agrona.concurrent.IdleStrategy;
 import weareadaptive.com.cluster.services.oms.util.ExecutionResult;
 import weareadaptive.com.cluster.services.oms.util.Order;
 
@@ -30,6 +31,6 @@ public interface ClusterClientResponder
     void onExecutionResult(ClientSession session, long correlationId, ExecutionResult executionResult);
     void onSuccessMessage(ClientSession session, long correlationId);
     void onOrders(ClientSession session, long messageId, TreeSet<Order> orders);
-
     void onOrderId(ClientSession session, long messageId, long currentOrderId);
+    void setIdleStrategy(IdleStrategy idleStrategy);
 }
