@@ -1,8 +1,12 @@
 package weareadaptive.com.cluster.services.infra;
 
 import com.weareadaptive.sbe.*;
+import io.aeron.Publication;
 import io.aeron.cluster.service.ClientSession;
+import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
+import org.agrona.concurrent.IdleStrategy;
+import org.agrona.concurrent.SleepingIdleStrategy;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +26,7 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
     private final OrderIdEncoder orderIdEncoder = new OrderIdEncoder();
     private final OrderEncoder orderEncoder = new OrderEncoder();
     private final EndOfOrdersEncoder endOfOrdersEncoder = new EndOfOrdersEncoder();
+    private IdleStrategy idleStrategy = new SleepingIdleStrategy();
     @Override
     public void onExecutionResult(ClientSession session, long correlationId, ExecutionResult executionResult)
     {
@@ -33,7 +38,8 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
         messageHeaderEncoder.correlationId(correlationId);
         executionResultEncoder.orderId(executionResult.getOrderId());
         executionResultEncoder.status(executionResult.getStatus().getByte());
-        while (session.offer(directBuffer, 0, encodedLength) < 0);
+        LOGGER.info("Sending executionResult");
+        sendMessageToSession(session, directBuffer, encodedLength);
     }
 
     @Override
@@ -45,7 +51,7 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
         successMessageEncoder.wrapAndApplyHeader(directBuffer, 0, messageHeaderEncoder);
         messageHeaderEncoder.correlationId(correlationId);
         successMessageEncoder.status(Status.SUCCESS.getByte());
-        while (session.offer(directBuffer, 0, encodedLength) < 0);
+        sendMessageToSession(session, directBuffer, encodedLength);
     }
 
     @Override
@@ -61,15 +67,14 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
             orderEncoder.orderId(order.getOrderId());
             orderEncoder.price(order.getPrice());
             orderEncoder.size(order.getSize());
-            while (session.offer(directBuffer, 0, encodedLength) < 0);
+            sendMessageToSession(session, directBuffer, encodedLength);
         }
 
         MutableDirectBuffer endOfOrdersBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(MessageHeaderEncoder.ENCODED_LENGTH));
 
         endOfOrdersEncoder.wrapAndApplyHeader(endOfOrdersBuffer, 0, messageHeaderEncoder);
         messageHeaderEncoder.correlationId(correlationId);
-
-        while (session.offer(endOfOrdersBuffer, 0, MessageHeaderEncoder.ENCODED_LENGTH) < 0);
+        sendMessageToSession(session, endOfOrdersBuffer, MessageHeaderEncoder.ENCODED_LENGTH);
     }
 
     @Override
@@ -81,6 +86,42 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
         orderIdEncoder.wrapAndApplyHeader(directBuffer, 0, messageHeaderEncoder);
         messageHeaderEncoder.correlationId(correlationId);
         orderIdEncoder.orderId(currentOrderId);
-        while (session.offer(directBuffer, 0, encodedLength) < 0);
+        sendMessageToSession(session, directBuffer, encodedLength);
+    }
+
+    @Override
+    public void setIdleStrategy(IdleStrategy idleStrategy)
+    {
+        this.idleStrategy = idleStrategy;
+    }
+
+    public void sendMessageToSession(ClientSession session, DirectBuffer directBuffer, int encodedLength) {
+        // todo: adjust according to wehther or not backpressure?? idk
+        final int offset = 0;
+        int retries = 0;
+        int RETRY_COUNT = 3;
+        do
+        {
+            idleStrategy.reset();
+            final long result = session.offer(directBuffer, offset, encodedLength);
+            if (result >= 0L)
+            {
+                return;
+            }
+            else if (result == Publication.ADMIN_ACTION || result == Publication.BACK_PRESSURED)
+            {
+                LOGGER.warn("backpressure or admin action on snapshot");
+            }
+            else if (result == Publication.NOT_CONNECTED || result == Publication.MAX_POSITION_EXCEEDED)
+            {
+                LOGGER.error("unexpected publication state on snapshot: {}", result);
+                return;
+            }
+            idleStrategy.idle();
+            retries += 1;
+        }
+        while (retries < RETRY_COUNT);
+
+        LOGGER.error("failed to offer snapshot within {} retries", RETRY_COUNT);
     }
 }
