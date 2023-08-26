@@ -3,8 +3,6 @@ package weareadaptive.com.gateway.client;
 import io.aeron.Publication;
 import io.aeron.cluster.client.AeronCluster;
 import org.agrona.MutableDirectBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import weareadaptive.com.cluster.services.oms.util.Method;
 import weareadaptive.com.cluster.services.oms.util.Side;
 
@@ -13,7 +11,6 @@ import java.util.Queue;
 
 public class ClientIngressSender
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ClientIngressSender.class);
     final private AeronCluster aeronCluster;
     final private Queue<MutableDirectBuffer> bufferQueue = new LinkedList<>();
     final private Queue<Integer> lengthQueue = new LinkedList<>();
@@ -26,11 +23,16 @@ public class ClientIngressSender
 
     public void sendMessageToCluster(MutableDirectBuffer buffer, int length) {
         int offerResponse = 0;
+
         bufferQueue.add(buffer);
         lengthQueue.add(length);
         while (!bufferQueue.isEmpty() && !lengthQueue.isEmpty()) {
-            offerResponse = (int) aeronCluster.offer(bufferQueue.poll(), 0, lengthQueue.poll());
+            offerResponse = (int) aeronCluster.offer(bufferQueue.peek(), 0, lengthQueue.peek());
             if (offerResponse != 0) break;
+            else {
+                bufferQueue.remove();
+                lengthQueue.remove();
+            }
         }
 
         if (offerResponse == (int) Publication.MAX_POSITION_EXCEEDED ||
