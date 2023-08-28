@@ -37,7 +37,7 @@ public class Deployment implements AutoCloseable
     public void startCluster(final int maxNodes, boolean testing) throws InterruptedException {
         for (int i = 0; i < maxNodes; i++)
         {
-            startNode(i,3, testing);
+            startNode(i, maxNodes, testing);
         }
     }
 
