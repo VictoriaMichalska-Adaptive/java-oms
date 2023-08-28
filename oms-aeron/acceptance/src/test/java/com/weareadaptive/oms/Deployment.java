@@ -2,19 +2,19 @@ package com.weareadaptive.oms;
 
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
+import org.agrona.CloseHelper;
 import weareadaptive.com.cluster.ClusterNode;
 import weareadaptive.com.gateway.Gateway;
 
 import java.util.HashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class Deployment {
-
+public class Deployment implements AutoCloseable
+{
     private final HashMap<Integer, ClusterNode> nodes = new HashMap<>();
     private final HashMap<Integer, Thread> nodeThreads = new HashMap<>();
     private Gateway gateway;
@@ -65,30 +65,6 @@ public class Deployment {
         });
     }
 
-    public void shutdownCluster(final CountDownLatch latch) {
-        nodes.forEach( (id, node) -> {
-            if (node != null && node.isActive()) {
-                // Signal the node to shutdown
-                node.getBarrier().signal();
-                // Wait for the node to shut down
-                waitToDie(node);
-            }
-        });
-
-        nodeThreads.forEach((id, thread) -> {
-            if (thread != null) {
-                // Interrupt the thread if it's still running
-                thread.interrupt();
-                // Join the thread
-                try {
-                    thread.join();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
-        latch.countDown();
-    }
     public void startNode(int nodeId, int maxNodes, boolean testing) throws InterruptedException {
         ClusterNode node = new ClusterNode();
         nodes.put(nodeId,node);
@@ -185,12 +161,13 @@ public class Deployment {
 
     void shutdownGateway()
     {
-        gateway.shutdown();
+        CloseHelper.close(gateway);
     }
 
-    void shutdownGateway(CountDownLatch latch)
+    @Override
+    public void close()
     {
-        gateway.shutdown();
-        latch.countDown();
+        CloseHelper.closeAll(gateway);
+        CloseHelper.closeAll(nodes.values());
     }
 }

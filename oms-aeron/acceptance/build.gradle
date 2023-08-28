@@ -16,12 +16,16 @@ dependencies {
     testImplementation 'io.vertx:vertx-junit5:4.4.0'
     testImplementation 'io.aeron:aeron-test-support:1.41.2'
     testImplementation 'io.netty:netty-resolver-dns-native-macos:4.1.94.Final:osx-aarch_64'
+    testImplementation 'org.openjdk.jmh:jmh-core:1.36'
+    testImplementation 'org.awaitility:awaitility:3.0.0'
+    testAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
     implementation project(':cluster')
     implementation project(':gateway')
 }
 
 test {
     useJUnitPlatform()
+    jvmArgs = ['--add-opens', 'java.base/sun.nio.ch=ALL-UNNAMED']
 }
 
 tasks.withType(Test).configureEach {

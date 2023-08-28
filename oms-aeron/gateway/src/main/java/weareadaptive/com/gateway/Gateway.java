@@ -4,15 +4,12 @@ import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import org.agrona.CloseHelper;
 import org.agrona.concurrent.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class Gateway
+public class Gateway implements AutoCloseable
 {
     private static GatewayAgent clientAgent;
     private static AgentRunner clientAgentRunner;
     private static IdleStrategy idleStrategy = new BusySpinIdleStrategy();
-    private static final Logger LOGGER = LoggerFactory.getLogger(Gateway.class);
     private final int maxNodes;
     private Handler<AsyncResult<String>> testContext;
 
@@ -43,11 +40,6 @@ public class Gateway
         return clientAgent.getLeaderId();
     }
 
-    public void shutdown()
-    {
-        CloseHelper.quietCloseAll(clientAgentRunner);
-    }
-
     public static void main(String[] args)
     {
         final int maxNodes = args.length > 0 ? Integer.parseInt(args[0]) : 1;
@@ -63,5 +55,15 @@ public class Gateway
         barrier.await();
 
         CloseHelper.quietCloseAll(clientAgentRunner);
+    }
+
+    @Override
+    public void close()
+    {
+        CloseHelper.quietCloseAll(clientAgentRunner);
+    }
+
+    public boolean isActive() {
+        return !clientAgentRunner.isClosed();
     }
 }

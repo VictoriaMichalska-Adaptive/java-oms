@@ -13,17 +13,18 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import weareadaptive.com.cluster.ClusterNode;
 import weareadaptive.com.cluster.services.oms.util.Side;
 import weareadaptive.com.gateway.ws.command.OrderCommand;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static io.vertx.core.Vertx.vertx;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,8 +55,6 @@ public class SnapshotTest
     public void clusterCanRecoverToStateFromSnapshot(final VertxTestContext testContext) throws Throwable
     {
         // todo: research awaitability
-        CountDownLatch shutdownLatch = new CountDownLatch(3);
-        CountDownLatch idLatch = new CountDownLatch(2);
         AtomicReference<List<TestOrder>> asks = new AtomicReference<>(null);
         AtomicReference<List<TestOrder>> bids = new AtomicReference<>(null);
         AtomicReference<Long> currentId = new AtomicReference<>(null);
@@ -63,40 +62,38 @@ public class SnapshotTest
         // set up non-default state
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             OrderCommand bidOrder = new OrderCommand(1, 100, Side.BID);
-            bids.set(makeTwoOrdersAndCheckThatTheyOccurred(bidOrder, shutdownLatch, idLatch));
-            idLatch.countDown();
+            bids.set(makeTwoOrdersAndCheckThatTheyOccurred(bidOrder));
         });
 
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             OrderCommand askOrder = new OrderCommand(100,1, Side.ASK);
-            asks.set(makeTwoOrdersAndCheckThatTheyOccurred(askOrder, shutdownLatch, idLatch));
+            asks.set(makeTwoOrdersAndCheckThatTheyOccurred(askOrder));
         });
 
-        idLatch.await();
+        await().until(() -> asks.get().size() + asks.get().size() == 4);
+
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             JsonObject orderIdRequest = new JsonObject();
             orderIdRequest.put("method", "orderId");
             Buffer getCurrentId = Buffer.buffer(orderIdRequest.encode());
             websocket.write(getCurrentId);
 
-            websocket.handler(response -> {
-                currentId.set(response.toJsonObject().getLong("orderId"));
-                shutdownLatch.countDown();
-            });
+            websocket.handler(response -> currentId.set(response.toJsonObject().getLong("orderId")));
         });
 
-        shutdownLatch.await();
+        await().until(() -> currentId.get() != null);
 
         // snapshot, shut down, and reboot
-        ClusterTool.snapshot(deployment.getNodes().get(deployment.getLeaderId()).getClusterDir(), System.out);
-
-        CountDownLatch completeLatch = new CountDownLatch(2);
-        deployment.shutdownCluster(completeLatch);
-        deployment.shutdownGateway(completeLatch);
-
-        completeLatch.await();
-        deployment.startGateway(1);
+        final boolean snapshot = ClusterTool.snapshot(deployment.getNodes().get(deployment.getLeaderId()).getClusterDir(), System.out);
+        await().until(() -> snapshot);
+        deployment.shutdownCluster();
+        await().until(() -> deployment.getNodes().values().stream().noneMatch(ClusterNode::isActive));
+        deployment.shutdownGateway();
+        await().until(() -> !deployment.getGateway().isActive());
         deployment.startSingleNodeCluster(false);
+        await().until(() -> deployment.getNodes().values().stream().anyMatch(ClusterNode::isActive));
+        deployment.startGateway(1);
+        await().until(() -> deployment.getGateway().isActive());
 
         // assert same state as original
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> {
@@ -110,12 +107,11 @@ public class SnapshotTest
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.ASK, webSocket, asks.get(), null));
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(webSocket -> getOrders(Side.BID, webSocket, bids.get(), testContext));
 
-        assertTrue(testContext.awaitCompletion(5, TimeUnit.SECONDS));
+        assertTrue(testContext.awaitCompletion(30, TimeUnit.SECONDS));
 
     }
 
-    private List<TestOrder> makeTwoOrdersAndCheckThatTheyOccurred(OrderCommand orderCommand, CountDownLatch bootupLatch,
-                                                                  CountDownLatch idLatch)
+    private List<TestOrder> makeTwoOrdersAndCheckThatTheyOccurred(OrderCommand orderCommand)
     {
         List<TestOrder> expectedOrders = new ArrayList<>();
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
@@ -135,8 +131,6 @@ public class SnapshotTest
                     expectedOrders.add(new TestOrder(secondOrderId, orderCommand.price(), orderCommand.size()));
 
                     getOrders(orderCommand.side(), websocket, expectedOrders, null);
-                    bootupLatch.countDown();
-                    idLatch.countDown();
                 });
             });
         });

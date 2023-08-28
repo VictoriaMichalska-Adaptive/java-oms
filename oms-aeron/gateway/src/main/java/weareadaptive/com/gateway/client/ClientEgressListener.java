@@ -33,6 +33,7 @@ public class ClientEgressListener implements EgressListener
         final int typeOfMessage = messageHeaderDecoder.templateId();
         final long correlationId = messageHeaderDecoder.correlationId();
 
+        // todo: i think there's a stupid race condition here
         if (allWebsockets.containsKey(correlationId))
         {
             final int actingBlockLength = messageHeaderDecoder.blockLength();
@@ -64,6 +65,7 @@ public class ClientEgressListener implements EgressListener
             default -> throw new BadFieldException("method not supported");
         };
 
+        LOGGER.info("Sending message with correlation ID ".concat(String.valueOf(correlationId)));
         allWebsockets.get(correlationId).write(jsonObject.toBuffer());
         allWebsockets.remove(correlationId);
     }

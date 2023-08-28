@@ -38,7 +38,6 @@ public class ClusterClientResponderImpl implements ClusterClientResponder
         messageHeaderEncoder.correlationId(correlationId);
         executionResultEncoder.orderId(executionResult.getOrderId());
         executionResultEncoder.status(executionResult.getStatus().getByte());
-        LOGGER.info("Sending executionResult");
         sendMessageToSession(session, directBuffer, encodedLength);
     }
 

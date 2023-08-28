@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import static weareadaptive.com.cluster.util.ConfigUtils.*;
 
-public class ClusterNode
+public class ClusterNode implements AutoCloseable
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterNode.class);
 
@@ -83,10 +83,7 @@ public class ClusterNode
 
             barrier.await();
 
-            CloseHelper.quietClose(clusteredMediaDriver);
-            CloseHelper.quietClose(clusteredServiceContainer);
-
-            setActive(false);
+            close();
             LOGGER.info("Exiting");
         }
     }
@@ -113,5 +110,13 @@ public class ClusterNode
 
     public File getClusterDir() {
         return clusterDir;
+    }
+
+    @Override
+    public void close()
+    {
+        CloseHelper.quietClose(clusteredMediaDriver);
+        CloseHelper.quietClose(clusteredServiceContainer);
+        setActive(false);
     }
 }
