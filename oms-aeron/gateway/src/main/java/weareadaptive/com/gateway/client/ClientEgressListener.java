@@ -70,8 +70,6 @@ public class ClientEgressListener implements EgressListener
         allWebsockets.remove(correlationId);
     }
 
-
-
     @Override
     public void onSessionEvent(final long correlationId, final long clusterSessionId, final long leadershipTermId,
                                final int leaderMemberId,

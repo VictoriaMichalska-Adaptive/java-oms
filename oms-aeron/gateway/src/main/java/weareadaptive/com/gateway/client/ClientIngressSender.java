@@ -2,7 +2,7 @@ package weareadaptive.com.gateway.client;
 
 import io.aeron.Publication;
 import io.aeron.cluster.client.AeronCluster;
-import org.agrona.MutableDirectBuffer;
+import org.agrona.DirectBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import weareadaptive.com.cluster.services.oms.util.Method;
@@ -16,7 +16,7 @@ public class ClientIngressSender
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientIngressSender.class);
     final private AeronCluster aeronCluster;
-    final private ConcurrentLinkedQueue<MutableDirectBuffer> bufferQueue = new ConcurrentLinkedQueue<>();
+    final private ConcurrentLinkedQueue<DirectBuffer> bufferQueue = new ConcurrentLinkedQueue<>();
     final private Queue<Integer> lengthQueue = new LinkedList<>();
     final private Encoder encoder = new Encoder();
 
@@ -25,7 +25,7 @@ public class ClientIngressSender
         this.aeronCluster = aeronCluster;
     }
 
-    public void sendMessageToCluster(MutableDirectBuffer buffer, int length) {
+    public void sendMessageToCluster(final DirectBuffer buffer, final int length) {
         long offerResponse = 0;
 
         bufferQueue.add(buffer);
