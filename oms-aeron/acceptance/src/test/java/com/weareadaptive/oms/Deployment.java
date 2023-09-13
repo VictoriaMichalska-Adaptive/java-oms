@@ -1,5 +1,6 @@
 package com.weareadaptive.oms;
 
+import com.weareadaptive.oms.dsl.TestClientDsl;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import org.agrona.CloseHelper;
@@ -21,6 +22,12 @@ public class Deployment implements AutoCloseable
     public Gateway getGateway() {
         return gateway;
     }
+    private TestClientDsl testClientDsl;
+
+    public TestClientDsl getTestClientDsl()
+    {
+        return testClientDsl;
+    }
 
     public HashMap<Integer, ClusterNode> getNodes() {
         return nodes;
@@ -28,6 +35,11 @@ public class Deployment implements AutoCloseable
 
     public HashMap<Integer, Thread> getNodeThreads() {
         return nodeThreads;
+    }
+
+    public void startTestClientDsl(final int maxNodes) {
+        testClientDsl = new TestClientDsl(maxNodes);
+        testClientDsl.startClient();
     }
 
     public void startSingleNodeCluster(boolean testing) throws InterruptedException {
@@ -168,6 +180,7 @@ public class Deployment implements AutoCloseable
     public void close()
     {
         CloseHelper.closeAll(gateway);
+        CloseHelper.closeAll(testClientDsl);
         CloseHelper.closeAll(nodes.values());
     }
 }
