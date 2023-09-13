@@ -70,7 +70,7 @@ public class SnapshotTest
             asks.set(makeTwoOrdersAndCheckThatTheyOccurred(askOrder));
         });
 
-        await().until(() -> asks.get().size() + asks.get().size() == 4);
+        await().until(() -> asks.get().size() + bids.get().size() == 4);
 
         vertxClient.webSocket(8080, "localhost", "/").onSuccess(websocket -> {
             JsonObject orderIdRequest = new JsonObject();
@@ -82,7 +82,7 @@ public class SnapshotTest
         });
 
         await().until(() -> currentId.get() != null);
-
+        // todo: testing dsl??
         // snapshot, shut down, and reboot
         final boolean snapshot = ClusterTool.snapshot(deployment.getNodes().get(deployment.getLeaderId()).getClusterDir(), System.out);
         await().until(() -> snapshot);

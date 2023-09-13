@@ -20,7 +20,7 @@ public class ClientEgressListener implements EgressListener
     private int currentLeader = -1;
     private final MessageHeaderDecoder messageHeaderDecoder = new MessageHeaderDecoder();
     private final Map<Long, ServerWebSocket> allWebsockets = new ConcurrentHashMap<>();
-    private final Decoder decoder = new Decoder();
+    private final BinaryJsonCodec binaryJsonCodec = new BinaryJsonCodec();
 
     @Override
     public void onMessage(final long clusterSessionId, final long timestamp, final DirectBuffer buffer,
@@ -33,7 +33,7 @@ public class ClientEgressListener implements EgressListener
         final int typeOfMessage = messageHeaderDecoder.templateId();
         final long correlationId = messageHeaderDecoder.correlationId();
 
-        // todo: i think there's a stupid race condition here
+        // todo: i think the re's a stupid race condition here
         if (allWebsockets.containsKey(correlationId))
         {
             final int actingBlockLength = messageHeaderDecoder.blockLength();
@@ -41,7 +41,7 @@ public class ClientEgressListener implements EgressListener
             bufferOffset += messageHeaderDecoder.encodedLength();
 
             if (typeOfMessage == OrderDecoder.TEMPLATE_ID) {
-                decoder.addOrderToCollectionOfAllOrders(correlationId, buffer, bufferOffset, actingBlockLength, actingVersion);
+                binaryJsonCodec.addOrderToCollectionOfAllOrders(correlationId, buffer, bufferOffset, actingBlockLength, actingVersion);
             }
             else
             {
@@ -57,13 +57,16 @@ public class ClientEgressListener implements EgressListener
                              final int actingBlockLength, final int actingVersion)
     {
         JsonObject jsonObject = switch (typeOfMessage)
-        {
-            case SuccessMessageDecoder.TEMPLATE_ID -> decoder.getSuccessMessageAsJson(buffer, bufferOffset, actingBlockLength, actingVersion);
-            case ExecutionResultDecoder.TEMPLATE_ID -> decoder.getExecutionResultAsJson(buffer, bufferOffset, actingBlockLength, actingVersion);
-            case OrderIdDecoder.TEMPLATE_ID -> decoder.getOrderIdResponse(buffer, bufferOffset, actingBlockLength, actingVersion);
-            case EndOfOrdersDecoder.TEMPLATE_ID -> decoder.getOrdersResponse(correlationId);
-            default -> throw new BadFieldException("method not supported");
-        };
+                {
+                    case SuccessMessageDecoder.TEMPLATE_ID ->
+                            binaryJsonCodec.getSuccessMessageAsJson(buffer, bufferOffset, actingBlockLength, actingVersion);
+                    case ExecutionResultDecoder.TEMPLATE_ID ->
+                            binaryJsonCodec.getExecutionResultAsJson(buffer, bufferOffset, actingBlockLength, actingVersion);
+                    case OrderIdDecoder.TEMPLATE_ID ->
+                            binaryJsonCodec.getOrderIdResponse(buffer, bufferOffset, actingBlockLength, actingVersion);
+                    case EndOfOrdersDecoder.TEMPLATE_ID -> binaryJsonCodec.getOrdersResponse(correlationId);
+                    default -> throw new BadFieldException("method not supported");
+                };
 
         LOGGER.info("Sending message with correlation ID ".concat(String.valueOf(correlationId)));
         allWebsockets.get(correlationId).write(jsonObject.toBuffer());

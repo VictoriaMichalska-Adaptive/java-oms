@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class Decoder
+public class BinaryJsonCodec
 {
     private final Map<Long, List<Order>> ordersRequests = new ConcurrentHashMap<>();
     final ExecutionResult executionResult = new ExecutionResult();
@@ -52,7 +52,8 @@ public class Decoder
         return new Order(orderDecoder.orderId(), orderDecoder.price(), orderDecoder.size());
     }
 
-    protected void addOrderToCollectionOfAllOrders(final long correlationId, final DirectBuffer buffer, final int offset, final int actingBlockLength, final int actingVersion) {
+    public void addOrderToCollectionOfAllOrders(final long correlationId, final DirectBuffer buffer, final int offset,
+                                                final int actingBlockLength, final int actingVersion) {
         Order order = getOrder(buffer, offset, actingBlockLength, actingVersion);
         List<Order> listToUpdate = ordersRequests.getOrDefault(correlationId, new ArrayList<>());
         listToUpdate.add(order);
@@ -63,7 +64,8 @@ public class Decoder
     {
         List<Order> orders = ordersRequests.get(correlationId);
         JsonArray jsonArray = new JsonArray();
-        for (Order order : orders) {
+        for (Order order : orders)
+        {
             JsonObject orderJson = JsonObject.mapFrom(order);
             jsonArray.add(orderJson);
         }

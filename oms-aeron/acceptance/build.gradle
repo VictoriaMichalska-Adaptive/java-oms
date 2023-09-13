@@ -21,6 +21,7 @@ dependencies {
     testAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
     implementation project(':cluster')
     implementation project(':gateway')
+    implementation project(':sbe-protocol')
 }
 
 test {
