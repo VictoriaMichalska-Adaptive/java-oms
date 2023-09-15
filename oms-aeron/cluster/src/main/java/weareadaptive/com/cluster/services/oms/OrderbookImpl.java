@@ -12,15 +12,16 @@ import java.util.TreeSet;
 public class OrderbookImpl implements IOrderbook
 {
     private long currentOrderId = 0;
-    private final HashSet<Long> activeIds = new HashSet<>();
+    private final HashSet<Long> activeAsks = new HashSet<>();
+    private final HashSet<Long> activeBids = new HashSet<>();
     private final TreeSet<Order> asks = new TreeSet<>();
     private final TreeSet<Order> bids = new TreeSet<>();
 
     /**
      * * Implement Place Order logic
-     *  - Resting orders if prices do not cross
-     *  - Matching orders if prices do cross
-     *  - Returns orderId and status (RESTING, PARTIAL, FILLED)
+     * - Resting orders if prices do not cross
+     * - Matching orders if prices do cross
+     * - Returns orderId and status (RESTING, PARTIAL, FILLED)
      */
     @Override
     public ExecutionResult placeOrder(double price, long size, Side side) {
@@ -53,7 +54,13 @@ public class OrderbookImpl implements IOrderbook
         }
         else {
             orderList.add(newOrder);
-            activeIds.add(newOrder.getOrderId());
+            if (side == Side.ASK)
+            {
+                activeAsks.add(newOrder.getOrderId());
+            } else
+            {
+                activeBids.add(newOrder.getOrderId());
+            }
             return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
         }
     }
@@ -77,20 +84,37 @@ public class OrderbookImpl implements IOrderbook
                 sizeFulfilled = totalSize;
                 orderFromIterator.setSize(orderSize - sizeFulfilled);
             } else {
-                activeIds.remove(orderFromIterator.getOrderId());
+                activeAsks.remove(orderFromIterator.getOrderId());
                 iter.remove();
                 sizeFulfilled = orderSize;
             }
             totalSize -= sizeFulfilled;
-            if (totalSize == 0) break;
+            if (totalSize == 0)
+            {
+                break;
+            }
         }
 
-        if (totalSize == 0) return new ExecutionResult(newOrder.getOrderId(), Status.FILLED);
+        if (totalSize == 0)
+        {
+            return new ExecutionResult(newOrder.getOrderId(), Status.FILLED);
+        }
 
         orderList.add(newOrder);
-        activeIds.add(newOrder.getOrderId());
-        if (totalSize == newOrder.getSize()) return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
-        else return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL);
+        if (orderList == asks)
+        {
+            activeAsks.add(newOrder.getOrderId());
+        } else
+        {
+            activeBids.add(newOrder.getOrderId());
+        }
+        if (totalSize == newOrder.getSize())
+        {
+            return new ExecutionResult(newOrder.getOrderId(), Status.RESTING);
+        } else
+        {
+            return new ExecutionResult(newOrder.getOrderId(), Status.PARTIAL);
+        }
     }
 
     /**
@@ -100,10 +124,20 @@ public class OrderbookImpl implements IOrderbook
      */
     @Override
     public ExecutionResult cancelOrder(long orderId) {
-        if (!activeIds.contains(orderId)) {
+        final boolean removedFromAsks = activeAsks.remove(orderId);
+        final boolean removedFromBids = activeBids.remove(orderId);
+        if (!removedFromBids && !removedFromAsks)
+        {
             return new ExecutionResult(orderId, Status.NONE);
         }
-        activeIds.remove(orderId);
+        if (removedFromAsks)
+        {
+            asks.removeIf(x -> x.getOrderId() == orderId);
+        }
+        if (removedFromBids)
+        {
+            bids.removeIf(x -> x.getOrderId() == orderId);
+        }
         return new ExecutionResult(orderId, Status.CANCELLED);
     }
 
@@ -116,7 +150,8 @@ public class OrderbookImpl implements IOrderbook
     public void clear() {
         asks.clear();
         bids.clear();
-        activeIds.clear();
+        activeAsks.clear();
+        activeBids.clear();
     }
 
     /**
@@ -135,9 +170,9 @@ public class OrderbookImpl implements IOrderbook
         return asks.descendingSet();
     }
 
-    public HashSet<Long> getActiveIds()
+    public HashSet<Long> getActiveAsks()
     {
-        return activeIds;
+        return activeAsks;
     }
 
     public long getCurrentOrderId()

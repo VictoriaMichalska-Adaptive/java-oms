@@ -63,6 +63,9 @@ public class BinaryJsonCodec
     protected JsonObject getOrdersResponse(final long correlationId)
     {
         List<Order> orders = ordersRequests.get(correlationId);
+        if (orders == null) {
+            orders = new ArrayList<>();
+        }
         JsonArray jsonArray = new JsonArray();
         for (Order order : orders)
         {

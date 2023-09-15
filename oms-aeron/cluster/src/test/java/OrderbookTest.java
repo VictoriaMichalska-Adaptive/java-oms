@@ -68,7 +68,7 @@ public class OrderbookTest {
         // assert
         assertTrue(returnedAsk.getOrderId() > 0);
         assertEquals(Status.RESTING, returnedAsk.getStatus());
-        assertTrue(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
+        assertTrue(orderbook.getActiveAsks().contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -83,7 +83,7 @@ public class OrderbookTest {
         // assert
         assertTrue(returnedBid.getOrderId() > 0);
         assertEquals(Status.PARTIAL, returnedBid.getStatus());
-        assertTrue(orderbook.getActiveIds().contains(returnedBid.getOrderId()));
+        assertTrue(orderbook.getActiveAsks().contains(returnedBid.getOrderId()));
     }
 
     @Test
@@ -98,7 +98,7 @@ public class OrderbookTest {
         // assert
         assertTrue(returnedAsk.getOrderId() > 0);
         assertEquals(Status.PARTIAL, returnedAsk.getStatus());
-        assertTrue(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
+        assertTrue(orderbook.getActiveAsks().contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -113,7 +113,7 @@ public class OrderbookTest {
         // assert
         assertTrue(returnedBid.getOrderId() > 0);
         assertEquals(Status.FILLED, returnedBid.getStatus());
-        Assertions.assertFalse(orderbook.getActiveIds().contains(returnedBid.getOrderId()));
+        Assertions.assertFalse(orderbook.getActiveAsks().contains(returnedBid.getOrderId()));
     }
 
     @Test
@@ -178,7 +178,7 @@ public class OrderbookTest {
         // assert
         assertTrue(returnedAsk.getOrderId() > 0);
         assertEquals(Status.FILLED, returnedAsk.getStatus());
-        Assertions.assertFalse(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
+        Assertions.assertFalse(orderbook.getActiveAsks().contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -191,7 +191,7 @@ public class OrderbookTest {
         // assert
         assertEquals(returnedBid.getOrderId(), cancelledBid.getOrderId());
         assertEquals(Status.CANCELLED, cancelledBid.getStatus());
-        Assertions.assertFalse(orderbook.getActiveIds().contains(returnedBid.getOrderId()));
+        Assertions.assertFalse(orderbook.getActiveAsks().contains(returnedBid.getOrderId()));
     }
 
     @Test
@@ -204,7 +204,7 @@ public class OrderbookTest {
         // assert
         assertEquals(returnedAsk.getOrderId(), cancelledAsk.getOrderId());
         assertEquals(Status.CANCELLED, cancelledAsk.getStatus());
-        Assertions.assertFalse(orderbook.getActiveIds().contains(returnedAsk.getOrderId()));
+        Assertions.assertFalse(orderbook.getActiveAsks().contains(returnedAsk.getOrderId()));
     }
 
     @Test
@@ -214,7 +214,7 @@ public class OrderbookTest {
         final var cancelledBid = orderbook.cancelOrder(fakeId);
         assertEquals(fakeId, cancelledBid.getOrderId());
         assertEquals(Status.NONE, cancelledBid.getStatus());
-        Assertions.assertFalse(orderbook.getActiveIds().contains(fakeId));
+        Assertions.assertFalse(orderbook.getActiveAsks().contains(fakeId));
     }
 
     @Test
@@ -225,7 +225,7 @@ public class OrderbookTest {
         // assert
         assertEquals(fakeId, cancelledAsk.getOrderId());
         assertEquals(Status.NONE, cancelledAsk.getStatus());
-        Assertions.assertFalse(orderbook.getActiveIds().contains(fakeId));
+        Assertions.assertFalse(orderbook.getActiveAsks().contains(fakeId));
     }
 
     @Test
@@ -286,7 +286,7 @@ public class OrderbookTest {
 
         assertEquals(0, orderbook.getAsks().size());
         assertEquals(0, orderbook.getBids().size());
-        assertTrue(orderbook.getActiveIds().isEmpty());
+        assertTrue(orderbook.getActiveAsks().isEmpty());
         assertEquals(currentId, orderbook.getCurrentOrderId());
     }
 
@@ -307,7 +307,7 @@ public class OrderbookTest {
 
         assertEquals(0, orderbook.getAsks().size());
         assertEquals(0, orderbook.getBids().size());
-        assertTrue(orderbook.getActiveIds().isEmpty());
+        assertTrue(orderbook.getActiveAsks().isEmpty());
         assertEquals(0, orderbook.getCurrentOrderId());
     }
 
